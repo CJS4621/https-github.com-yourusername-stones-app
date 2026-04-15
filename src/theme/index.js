@@ -8,14 +8,27 @@ export const colors = {
   inkDark:     '#1C2330',
   inkMid:      '#4A5568',
   inkLight:    '#A0AEC0',
-  faith:             '#7B6FA0',
-  health:            '#4A9B6F',
-  finances:          '#C8952A',
-  relationships:     '#C0605A',
-  family:            '#5B8FCC',
-  work:              '#6B8E6B',
-  'answered-prayer': '#9B7B4A',
-  other:             '#8090A0',
+
+  // Richer category colors
+  faith:             '#6B5B9E',  // Deep purple
+  health:            '#2E8B57',  // Rich green
+  finances:          '#C8952A',  // Gold
+  relationships:     '#C0392B',  // Rich red
+  family:            '#2471A3',  // Deep blue
+  work:              '#27AE60',  // Emerald
+  'answered-prayer': '#8B6914',  // Deep amber
+  other:             '#607D8B',  // Blue grey
+
+  // Category background tints
+  faithBg:             '#F0EDF8',
+  healthBg:            '#EAF5EE',
+  financesBg:          '#FDF5E6',
+  relationshipsBg:     '#FDECEA',
+  familyBg:            '#EAF2FB',
+  workBg:              '#EAFAF1',
+  'answered-prayerBg': '#FDF0DC',
+  otherBg:             '#ECEFF1',
+
   border:      '#E8E0D4',
   prayGlow:    '#FFF3CD',
   error:       '#E53E3E',
@@ -95,3 +108,18 @@ export const CATEGORY_LABELS = {
   'answered-prayer': '🙏 Answered Prayer',
   'other':           '· Other',
 };
+
+// Helper to get category background tint
+export function getCategoryBg(category) {
+  const map = {
+    'faith':           colors.faithBg,
+    'health':          colors.healthBg,
+    'finances':        colors.financesBg,
+    'relationships':   colors.relationshipsBg,
+    'family':          colors.familyBg,
+    'work':            colors.workBg,
+    'answered-prayer': colors['answered-prayerBg'],
+    'other':           colors.otherBg,
+  };
+  return map[category] || colors.bgCard;
+}

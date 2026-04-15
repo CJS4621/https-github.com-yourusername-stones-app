@@ -263,3 +263,14 @@ export async function editStone(stoneId, text, category) {
   });
 }
 
+export async function markStoneAnswered(stoneId, answeredBy) {
+  return apiFetch(`/stones/${stoneId}/answered`, {
+    method: 'PATCH',
+    body: { answered_by: answeredBy },
+  });
+}
+
+export async function getAnsweredWall(page = 1) {
+  const params = new URLSearchParams({ page, limit: 20 });
+  return apiFetch(`/stones/answered?${params}`);
+}

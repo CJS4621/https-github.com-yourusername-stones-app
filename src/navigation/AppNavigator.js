@@ -17,6 +17,7 @@ import StoneDetailScreen   from '../screens/StoneDetailScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import CirclesScreen       from '../screens/CirclesScreen';
 import CircleDetailScreen  from '../screens/CircleDetailScreen';
+import AnsweredWallScreen  from '../screens/AnsweredWallScreen';
 import AuthScreen          from '../screens/AuthScreen';
 import { useAuth }         from '../context/AuthContext';
 
@@ -36,9 +37,10 @@ function TabIcon({ label, emoji, focused }) {
 
 function MoreModal({ visible, onClose, navigation }) {
   const items = [
-    { emoji: '🗺️', label: 'Journey',      screen: 'Journey' },
-    { emoji: '🙏', label: 'Prayer Queue', screen: 'PrayerQueue' },
-    { emoji: '📖', label: 'How To Use',   url: 'https://stonesapp.ca/how-to.html' },
+    { emoji: '🕊️', label: 'Answered Prayers', screen: 'AnsweredWall' },
+    { emoji: '🗺️', label: 'Journey',           screen: 'Journey' },
+    { emoji: '🙏', label: 'Prayer Queue',      screen: 'PrayerQueue' },
+    { emoji: '📖', label: 'How To Use',        url: 'https://stonesapp.ca/how-to.html' },
   ];
 
   return (
@@ -193,6 +195,11 @@ export default function AppNavigator() {
             <RootStack.Screen
               name="PrayerQueue"
               component={PrayerQueueScreen}
+              options={{ presentation: 'card' }}
+            />
+            <RootStack.Screen
+              name="AnsweredWall"
+              component={AnsweredWallScreen}
               options={{ presentation: 'card' }}
             />
           </>

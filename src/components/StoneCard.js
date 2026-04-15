@@ -1,29 +1,29 @@
-
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
-import { colors, fonts, spacing, radius, shadow, CATEGORY_LABELS } from '../theme';
-import { togglePrayer } from '../lib/api';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Alert } from 'react-native';
+import { colors, fonts, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
+import { togglePrayer, markStoneAnswered } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function StoneCard({ stone, onPress, onPressUser }) {
   const { user } = useAuth();
   const [prayCount, setPrayCount] = useState(stone.pray_count || 0);
   const [prayed, setPrayed]       = useState(false);
+  const [answered, setAnswered]   = useState(stone.answered || false);
   const [scale]                   = useState(new Animated.Value(1));
 
   const categoryColor = colors[stone.category] || colors.other;
-  const daysAgo = getDaysAgo(stone.created_at);
+  const categoryBg    = getCategoryBg(stone.category);
+  const daysAgo       = getDaysAgo(stone.created_at);
+  const isOwner       = user?.id === stone.user_id;
 
   async function handlePray() {
     if (!user) return;
-    // Optimistic update
     const next = prayed ? prayCount - 1 : prayCount + 1;
     setPrayed(!prayed);
-	Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setPrayCount(next);
 
-    // Bounce animation
     Animated.sequence([
       Animated.timing(scale, { toValue: 1.4, duration: 120, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1,   duration: 120, useNativeDriver: true }),
@@ -33,39 +33,67 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
       const res = await togglePrayer(stone.id, user.id);
       setPrayCount(res.pray_count);
     } catch {
-      // Revert on failure
       setPrayed(prayed);
       setPrayCount(prayCount);
     }
   }
 
+  async function handleMarkAnswered() {
+    Alert.alert(
+      '🕊️ Mark as Answered?',
+      'Has God answered this prayer? This stone will move to the Answered Prayer Wall.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, God Answered!',
+          onPress: async () => {
+            try {
+              await markStoneAnswered(stone.id, user.id);
+              setAnswered(true);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Praise God! 🙌', 'This stone has been moved to the Answered Prayer Wall!');
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Could not mark as answered.');
+            }
+          }
+        }
+      ]
+    );
+  }
+
+  if (answered) return null;
+
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, { backgroundColor: categoryBg }]}
       onPress={onPress}
       activeOpacity={0.92}
     >
-      {/* Category stripe */}
+      {/* Category stripe — wider and more prominent */}
       <View style={[styles.categoryStripe, { backgroundColor: categoryColor }]} />
 
       <View style={styles.content}>
         {/* Header */}
-		<TouchableOpacity
-			  style={styles.header}
-			  onPress={() => onPressUser && onPressUser(stone.user_id)}
-			  activeOpacity={0.7}
-	>
-		  <View style={styles.avatar}>
-			{stone.avatar_url
-			  ? <Image source={{ uri: stone.avatar_url }} style={styles.avatarImg} />
-			  : <Text style={styles.avatarInitial}>{(stone.display_name || '?')[0].toUpperCase()}</Text>
-			}
-		  </View>
-		  <View style={styles.headerText}>
-			<Text style={styles.name}>{stone.display_name || 'Anonymous'}</Text>
-			<Text style={styles.meta}>{CATEGORY_LABELS[stone.category]}  ·  {daysAgo}</Text>
-		  </View>
-		</TouchableOpacity>
+        <TouchableOpacity
+          style={styles.header}
+          onPress={() => onPressUser && onPressUser(stone.user_id)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.avatar, { borderColor: categoryColor }]}>
+            {stone.avatar_url
+              ? <Image source={{ uri: stone.avatar_url }} style={styles.avatarImg} />
+              : <Text style={[styles.avatarInitial, { color: categoryColor }]}>
+                  {(stone.display_name || '?')[0].toUpperCase()}
+                </Text>
+            }
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.name}>{stone.display_name || 'Anonymous'}</Text>
+            <Text style={[styles.meta, { color: categoryColor }]}>
+              {CATEGORY_LABELS[stone.category]}  ·  {daysAgo}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Stone text */}
         <Text style={styles.stoneText}>{stone.text}</Text>
@@ -77,14 +105,28 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <TouchableOpacity onPress={handlePray} style={styles.prayBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={handlePray}
+            style={[styles.prayBtn, prayed && { backgroundColor: categoryColor + '22' }]}
+            activeOpacity={0.7}
+          >
             <Animated.Text style={[styles.prayIcon, { transform: [{ scale }] }]}>
               {prayed ? '🙏' : '🤲'}
             </Animated.Text>
-            <Text style={[styles.prayCount, prayed && styles.prayCountActive]}>
+            <Text style={[styles.prayCount, prayed && { color: categoryColor }]}>
               {prayCount > 0 ? prayCount : 'Pray'}
             </Text>
           </TouchableOpacity>
+
+          {(isOwner || prayed) && (
+            <TouchableOpacity
+              onPress={handleMarkAnswered}
+              style={[styles.answeredBtn, { borderColor: categoryColor }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.answeredBtnText, { color: categoryColor }]}>🕊️ Answered</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -103,7 +145,6 @@ function getDaysAgo(dateStr) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
     borderRadius: radius.md,
     marginHorizontal: spacing.md,
     marginVertical: spacing.sm,
@@ -112,7 +153,7 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   categoryStripe: {
-    width: 4,
+    width: 6,
   },
   content: {
     flex: 1,
@@ -131,8 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderWidth: 2,
   },
   avatarImg: {
     width: 36,
@@ -142,20 +182,16 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontFamily: fonts.uiBold,
     fontSize: 14,
-    color: colors.inkMid,
   },
-  headerText: {
-    flex: 1,
-  },
+  headerText: { flex: 1 },
   name: {
     fontFamily: fonts.uiBold,
     fontSize: 14,
     color: colors.inkDark,
   },
   meta: {
-    fontFamily: fonts.caption,
+    fontFamily: fonts.uiBold,
     fontSize: 11,
-    color: colors.inkLight,
     marginTop: 1,
   },
   stoneText: {
@@ -175,6 +211,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.xs,
+    gap: spacing.sm,
   },
   prayBtn: {
     flexDirection: 'row',
@@ -193,7 +230,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkMid,
   },
-  prayCountActive: {
-    color: colors.gold,
+  answeredBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+  },
+  answeredBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
   },
 });
