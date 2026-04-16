@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stones Rev 10 — Testing Checklist</title>
+  <style>
+    :root {
+      --gold: #C9A84C;
+      --gold-light: #F5EDD6;
+      --bg: #FAF8F4;
+      --bg-card: #FFFFFF;
+      --ink-dark: #1A1A1A;
+      --ink-mid: #4A4A4A;
+      --ink-light: #9A9A9A;
+      --border: #EDE9E0;
+      --green: #2E8B57;
+      --red: #E53E3E;
+      --orange: #DD6B20;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--ink-dark); padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 4px; }
+    .subtitle { color: var(--ink-light); font-size: 14px; margin-bottom: 24px; }
+    .tester-select { display: flex; gap: 12px; margin-bottom: 32px; }
+    .tester-btn { padding: 10px 24px; border-radius: 50px; border: 2px solid var(--border); background: var(--bg-card); cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-mid); transition: all 0.2s; }
+    .tester-btn.active { background: var(--gold); border-color: var(--gold); color: white; }
+    .section { margin-bottom: 32px; }
+    .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+    .section-icon { font-size: 24px; }
+    .section-title { font-size: 18px; font-weight: 700; }
+    .section-count { margin-left: auto; font-size: 13px; color: var(--ink-light); }
+    .test-item { background: var(--bg-card); border-radius: 12px; padding: 16px; margin-bottom: 8px; border: 1px solid var(--border); }
+    .test-item-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .test-name { font-weight: 600; font-size: 15px; flex: 1; }
+    .status-btns { display: flex; gap: 6px; }
+    .status-btn { padding: 4px 12px; border-radius: 50px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+    .status-btn.pass { color: var(--green); border-color: var(--green); }
+    .status-btn.pass.active { background: var(--green); color: white; }
+    .status-btn.fail { color: var(--red); border-color: var(--red); }
+    .status-btn.fail.active { background: var(--red); color: white; }
+    .status-btn.partial { color: var(--orange); border-color: var(--orange); }
+    .status-btn.partial.active { background: var(--orange); color: white; }
+    .test-steps { font-size: 13px; color: var(--ink-mid); line-height: 1.6; margin-bottom: 8px; }
+    .test-notes { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: -apple-system, sans-serif; color: var(--ink-dark); background: var(--bg); resize: none; min-height: 36px; }
+    .test-notes:focus { outline: none; border-color: var(--gold); }
+    .test-notes::placeholder { color: var(--ink-light); }
+    .progress-bar-wrapper { background: var(--bg-card); border-radius: 16px; padding: 20px; margin-bottom: 32px; border: 1px solid var(--border); }
+    .progress-title { font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; }
+    .progress-bar { height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--gold); border-radius: 6px; transition: width 0.3s; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+    .summary-item { text-align: center; padding: 12px; border-radius: 10px; }
+    .summary-item.pass { background: #EAF5EE; }
+    .summary-item.fail { background: #FEF0F0; }
+    .summary-item.partial { background: #FFF5EB; }
+    .summary-num { font-size: 28px; font-weight: 700; }
+    .summary-num.pass { color: var(--green); }
+    .summary-num.fail { color: var(--red); }
+    .summary-num.partial { color: var(--orange); }
+    .summary-label { font-size: 12px; color: var(--ink-light); margin-top: 2px; }
+    .export-btn { background: var(--gold); color: white; border: none; padding: 14px 32px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 16px; }
+    .export-btn:hover { opacity: 0.9; }
+    .category-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 50px; margin-right: 6px; }
+    .tag-crash { background: #FEE; color: var(--red); }
+    .tag-ui { background: #EEF; color: #5B6BCC; }
+    .tag-feature { background: #EFE; color: var(--green); }
+    .tag-ux { background: #FFF0E0; color: var(--orange); }
+  </style>
+</head>
+<body>
+
+  <h1>🪨 Stones Rev 10</h1>
+  <p class="subtitle">Testing Checklist — April 2026</p>
+
+  <!-- Tester Select -->
+  <div class="tester-select">
+    <button class="tester-btn active" onclick="setTester('Cliff')">👤 Cliff</button>
+    <button class="tester-btn" onclick="setTester('Jacqueline')">👤 Jacqueline</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar-wrapper">
+    <div class="progress-title">
+      <span>Testing Progress</span>
+      <span id="progress-text">0 / 0 tested</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-item pass"><div class="summary-num pass" id="pass-count">0</div><div class="summary-label">✅ Passed</div></div>
+      <div class="summary-item fail"><div class="summary-num fail" id="fail-count">0</div><div class="summary-label">❌ Failed</div></div>
+      <div class="summary-item partial"><div class="summary-num partial" id="partial-count">0</div><div class="summary-label">⚠️ Issues</div></div>
+    </div>
+  </div>
+
+  <!-- AUTHENTICATION -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🔐</span>
+      <span class="section-title">Authentication</span>
+      <span class="section-count" id="count-auth"></span>
+    </div>
+
+    <div class="test-item" data-section="auth">
+      <div class="test-item-header">
+        <span class="test-name">Sign Up</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Create a new account with email and password. Check confirmation email arrives. Click link to confirm account.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="auth">
+      <div class="test-item-header">
+        <span class="test-name">Sign In</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Sign in with existing email and password. Verify app loads Wall screen after login.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="auth">
+      <div class="test-item-header">
+        <span class="test-name">Sign Out</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Go to Profile → Sign Out. Verify app returns to login screen.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- WALL -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🏠</span>
+      <span class="section-title">Wall</span>
+      <span class="section-count" id="count-wall"></span>
+    </div>
+
+    <div class="test-item" data-section="wall">
+      <div class="test-item-header">
+        <span class="test-name">Wall Loads</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Open app. Wall shows community stones with category color backgrounds.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="wall">
+      <div class="test-item-header">
+        <span class="test-name">Category Filters</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap Faith, Health, Finances etc. chips. Wall filters to show only that category.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="wall">
+      <div class="test-item-header">
+        <span class="test-name">Pray for Stone</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap 🤲 on a stone. Count increases. Stone appears in Prayer Queue.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="wall">
+      <div class="test-item-header">
+        <span class="test-name">Mark Stone Answered</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap 🕊️ Answered on your own stone. Confirm prompt. Stone disappears from wall and appears in Answered Prayers.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="wall">
+      <div class="test-item-header">
+        <span class="test-name">Stone Detail</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap any stone. Detail screen opens. Back button returns to wall.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- DROP STONE -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🪨</span>
+      <span class="section-title">Drop Stone</span>
+      <span class="section-count" id="count-drop"></span>
+    </div>
+
+    <div class="test-item" data-section="drop">
+      <div class="test-item-header">
+        <span class="test-name">Immersive Screen</span>
+        <span class="category-tag tag-ui">UI</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap 🪨 FAB. Screen opens with colored background. Scripture verse shows. Background changes color when category changes.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="drop">
+      <div class="test-item-header">
+        <span class="test-name">Drop Animation</span>
+        <span class="category-tag tag-ui">UI</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Write a stone and tap Drop. 🪨 animates and flies up. Stone appears on wall.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="drop">
+      <div class="test-item-header">
+        <span class="test-name">Edit Stone</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap your stone → detail screen → ✏️ Edit. Edit text and category. Save. Changes appear immediately.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="drop">
+      <div class="test-item-header">
+        <span class="test-name">Delete Stone</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap your stone → detail screen → Delete Stone. Confirm. Stone removed from wall.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- CIRCLES -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">💛</span>
+      <span class="section-title">Circles</span>
+      <span class="section-count" id="count-circles"></span>
+    </div>
+
+    <div class="test-item" data-section="circles">
+      <div class="test-item-header">
+        <span class="test-name">Create Circle</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap 💛 Circles tab → + New. Enter name. Circle created and appears in list.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="circles">
+      <div class="test-item-header">
+        <span class="test-name">Circle Navigation</span>
+        <span class="category-tag tag-ux">UX</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap a circle → detail screen. Back button returns to Circles list. Tab bar visible throughout.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="circles">
+      <div class="test-item-header">
+        <span class="test-name">Add Member</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Inside circle tap + Add Member. Search by name. Add member. They appear in members list.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- MORE MENU -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">⋯</span>
+      <span class="section-title">More Menu</span>
+      <span class="section-count" id="count-more"></span>
+    </div>
+
+    <div class="test-item" data-section="more">
+      <div class="test-item-header">
+        <span class="test-name">Prayer Queue</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">More → Prayer Queue. Shows stones you've prayed for with avatars and category colors. Back button works.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="more">
+      <div class="test-item-header">
+        <span class="test-name">God Answered This</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">In Prayer Queue tap 🕊️ God Answered This. Stone removed from queue. Praise alert shows.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="more">
+      <div class="test-item-header">
+        <span class="test-name">Answered Prayers Wall</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">More → Answered Prayers. Shows stones marked as answered. Back button works.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="more">
+      <div class="test-item-header">
+        <span class="test-name">Journey</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">More → Journey. Shows personal timeline of your stones. Back button works.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="more">
+      <div class="test-item-header">
+        <span class="test-name">How To Use</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">More → How To Use. Opens stonesapp.ca/how-to.html in browser.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🙋</span>
+      <span class="section-title">Profile</span>
+      <span class="section-count" id="count-profile"></span>
+    </div>
+
+    <div class="test-item" data-section="profile">
+      <div class="test-item-header">
+        <span class="test-name">View Profile</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap Me tab. Profile shows name, bio, stones, badges and followers.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="profile">
+      <div class="test-item-header">
+        <span class="test-name">Edit Profile</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap name/bio. Edit modal opens. Update name and bio. Save. Changes appear on profile.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="profile">
+      <div class="test-item-header">
+        <span class="test-name">Upload Avatar</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap avatar. Select photo from library. Photo uploads and appears as profile picture.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="profile">
+      <div class="test-item-header">
+        <span class="test-name">Badges</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Badges grid shows earned badges and locked badges correctly.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- DISCOVER -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🔍</span>
+      <span class="section-title">Discover</span>
+      <span class="section-count" id="count-discover"></span>
+    </div>
+
+    <div class="test-item" data-section="discover">
+      <div class="test-item-header">
+        <span class="test-name">Search Users</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap Discover tab. Search by name. Users appear in results.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="discover">
+      <div class="test-item-header">
+        <span class="test-name">Follow / Unfollow</span>
+        <span class="category-tag tag-feature">Feature</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tap Follow on a user. Button changes to Unfollow. Tap again to unfollow.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <!-- UI / GENERAL -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🎨</span>
+      <span class="section-title">UI & General</span>
+      <span class="section-count" id="count-ui"></span>
+    </div>
+
+    <div class="test-item" data-section="ui">
+      <div class="test-item-header">
+        <span class="test-name">Tab Bar</span>
+        <span class="category-tag tag-ui">UI</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Tab bar shows Wall, Circles, 🪨, Discover, Me, More. Icons are visible and centered.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="ui">
+      <div class="test-item-header">
+        <span class="test-name">Category Colors</span>
+        <span class="category-tag tag-ui">UI</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">Stone cards show different background colors per category. Stripe color matches category.</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-section="ui">
+      <div class="test-item-header">
+        <span class="test-name">Overall Feel</span>
+        <span class="category-tag tag-ux">UX</span>
+        <div class="status-btns">
+          <button class="status-btn pass" onclick="setStatus(this, 'pass')">✅ Pass</button>
+          <button class="status-btn partial" onclick="setStatus(this, 'partial')">⚠️ Issue</button>
+          <button class="status-btn fail" onclick="setStatus(this, 'fail')">❌ Fail</button>
+        </div>
+      </div>
+      <p class="test-steps">General feel of the app. Does it feel polished, faith-inspired and welcoming?</p>
+      <textarea class="test-notes" placeholder="Notes..."></textarea>
+    </div>
+  </div>
+
+  <button class="export-btn" onclick="exportResults()">📋 Export Test Results</button>
+
+  <script>
+    let currentTester = 'Cliff';
+
+    function setTester(name) {
+      currentTester = name;
+      document.querySelectorAll('.tester-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      loadData();
+    }
+
+    function setStatus(btn, status) {
+      const item = btn.closest('.test-item');
+      item.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      saveData();
+      updateProgress();
+      updateSectionCounts();
+    }
+
+    function saveData() {
+      const data = {};
+      document.querySelectorAll('.test-item').forEach((item, i) => {
+        const activeBtn = item.querySelector('.status-btn.active');
+        const notes = item.querySelector('.test-notes').value;
+        data[i] = { status: activeBtn ? activeBtn.classList[1] : null, notes };
+      });
+      localStorage.setItem(`stones_test_${currentTester}`, JSON.stringify(data));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem(`stones_test_${currentTester}`);
+      if (!saved) return;
+      const data = JSON.parse(saved);
+      document.querySelectorAll('.test-item').forEach((item, i) => {
+        if (data[i]) {
+          item.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+          if (data[i].status) {
+            const btn = item.querySelector(`.status-btn.${data[i].status}`);
+            if (btn) btn.classList.add('active');
+          }
+          item.querySelector('.test-notes').value = data[i].notes || '';
+        }
+      });
+      updateProgress();
+      updateSectionCounts();
+    }
+
+    function updateProgress() {
+      const items = document.querySelectorAll('.test-item');
+      let pass = 0, fail = 0, partial = 0, tested = 0;
+      items.forEach(item => {
+        const active = item.querySelector('.status-btn.active');
+        if (active) {
+          tested++;
+          if (active.classList.contains('pass')) pass++;
+          if (active.classList.contains('fail')) fail++;
+          if (active.classList.contains('partial')) partial++;
+        }
+      });
+      const total = items.length;
+      const pct = total > 0 ? Math.round((tested / total) * 100) : 0;
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-text').textContent = `${tested} / ${total} tested`;
+      document.getElementById('pass-count').textContent = pass;
+      document.getElementById('fail-count').textContent = fail;
+      document.getElementById('partial-count').textContent = partial;
+    }
+
+    function updateSectionCounts() {
+      const sections = ['auth', 'wall', 'drop', 'circles', 'more', 'profile', 'discover', 'ui'];
+      sections.forEach(sec => {
+        const items = document.querySelectorAll(`[data-section="${sec}"]`);
+        const tested = Array.from(items).filter(i => i.querySelector('.status-btn.active')).length;
+        const el = document.getElementById(`count-${sec}`);
+        if (el) el.textContent = `${tested}/${items.length}`;
+      });
+    }
+
+    function exportResults() {
+      let report = `STONES REV 10 — TEST RESULTS\nTester: ${currentTester}\nDate: ${new Date().toLocaleDateString()}\n\n`;
+      document.querySelectorAll('.section').forEach(section => {
+        const title = section.querySelector('.section-title').textContent;
+        report += `\n=== ${title} ===\n`;
+        section.querySelectorAll('.test-item').forEach(item => {
+          const name = item.querySelector('.test-name').textContent;
+          const active = item.querySelector('.status-btn.active');
+          const status = active ? active.textContent.trim() : 'Not tested';
+          const notes = item.querySelector('.test-notes').value;
+          report += `${name}: ${status}`;
+          if (notes) report += `\n  Notes: ${notes}`;
+          report += '\n';
+        });
+      });
+      const blob = new Blob([report], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `stones-rev10-${currentTester.toLowerCase()}-results.txt`;
+      a.click();
+    }
+
+    // Auto-save notes
+    document.querySelectorAll('.test-notes').forEach(ta => {
+      ta.addEventListener('input', saveData);
+    });
+
+    loadData();
+    updateSectionCounts();
+  </script>
+</body>
+</html>
