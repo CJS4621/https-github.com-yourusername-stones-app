@@ -1,4 +1,4 @@
-import { NODE_RED_URL } from '@env';
+const NODE_RED_URL = process.env.NODE_RED_URL;
 import { supabase } from './supabase';
 
 // ── Authenticated fetch wrapper ─────────────────────────────
