@@ -18,6 +18,23 @@ export default function App() {
   });
 
   useEffect(() => {
+    // Handle invalid/expired session — auto sign out
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'SIGNED_OUT') return;
+      if (!session && event !== 'INITIAL_SESSION') {
+        supabase.auth.signOut();
+      }
+    });
+
+    // Handle auth errors globally
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error?.message?.includes('Refresh Token Not Found') ||
+          error?.message?.includes('Invalid Refresh Token')) {
+        supabase.auth.signOut();
+      }
+    });
+
     // Handle deep link when app is already open
     const subscription = Linking.addEventListener('url', ({ url }) => {
       if (url) supabase.auth.getSession();
@@ -28,19 +45,23 @@ export default function App() {
       if (url) supabase.auth.getSession();
     });
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   if (fontError) {
     return (
-      <View style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Text>Font error: {fontError.message}</Text>
       </View>
     );
   }
+
   if (!fontsLoaded) {
     return (
-      <View style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Text>Loading fonts...</Text>
       </View>
     );
