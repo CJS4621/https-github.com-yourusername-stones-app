@@ -240,12 +240,7 @@ export async function leaveCircle(circleId, userId) {
 }
 
 export async function getCircleMembers(circleId) {
-  const { data, error } = await supabase
-    .from('circle_members')
-    .select('user_id, role, joined_at, users(id, display_name, avatar_url)')
-    .eq('circle_id', circleId);
-  if (error) throw error;
-  return data || [];
+  return apiFetch(`/circles/${circleId}/members`);
 }
 
 export async function markPrayerAnswered(userId, stoneId) {

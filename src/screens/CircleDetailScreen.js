@@ -36,16 +36,22 @@ export default function CircleDetailScreen({ route, navigation }) {
   }, []);
 
   async function loadMembers() {
-    setLoading(true);
-    try {
-      const data = await getCircleMembers(circle.id);
-      setMembers(data);
-    } catch (err) {
-      console.log('Error loading members:', err);
-    } finally {
-      setLoading(false);
-    }
+  setLoading(true);
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const data = await getCircleMembers(circle.id);
+    // Temporary debug alert
+    Alert.alert(
+      'Debug', 
+      `Session: ${sessionData?.session?.user?.id}\nMembers: ${JSON.stringify(data)}`
+    );
+    setMembers(data);
+  } catch (err) {
+    Alert.alert('Error', err.message);
+  } finally {
+    setLoading(false);
   }
+}}
 
   async function handleSearch(text) {
     setSearchQuery(text);
@@ -62,11 +68,12 @@ export default function CircleDetailScreen({ route, navigation }) {
     setInviting(targetUser.id);
     try {
       await inviteToCircle(circle.id, targetUser.id);
-      Alert.alert('Member Added! 🫂', `${targetUser.display_name} has been added to ${circle.name}.`);
       setShowInvite(false);
       setSearchQuery('');
       setSearchResults([]);
-      loadMembers();
+      // Small delay to allow DB to commit before reloading
+      setTimeout(() => loadMembers(), 500);
+      Alert.alert('Member Added! 🫂', `${targetUser.display_name} has been added to ${circle.name}.`);
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not add member.');
     } finally {
@@ -208,17 +215,19 @@ export default function CircleDetailScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Header */}
+      {/* Header — redesigned to two rows */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={s.back}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{circle.name}</Text>
-        {isAdmin && members.length < 12 && (
-          <TouchableOpacity style={s.addMemberBtn} onPress={() => setShowInvite(true)}>
-            <Text style={s.addMemberBtnText}>+ Add Member</Text>
+        <View style={s.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={s.back}>← Back</Text>
           </TouchableOpacity>
-        )}
+          {isAdmin && members.length < 12 && (
+            <TouchableOpacity style={s.addMemberBtn} onPress={() => setShowInvite(true)}>
+              <Text style={s.addMemberBtnText}>+ Add Member</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={s.headerTitle}>{circle.name}</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
@@ -272,13 +281,17 @@ export default function CircleDetailScreen({ route, navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginBottom: spacing.xs,
   },
   back: {
     fontFamily: fonts.ui,
@@ -286,8 +299,8 @@ const s = StyleSheet.create({
     color: colors.gold,
   },
   headerTitle: {
-    fontFamily: fonts.uiBold,
-    fontSize: type.uiSize,
+    fontFamily: type.displayFont,
+    fontSize: 22,
     color: colors.inkDark,
   },
   addMemberBtn: {

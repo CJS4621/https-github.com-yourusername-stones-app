@@ -1,12 +1,12 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList, StyleSheet, Text, TouchableOpacity, View,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { getAnsweredWall } from '../lib/api';
-import { colors, fonts, type, spacing, radius, CATEGORY_LABELS } from '../theme';
+import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 
 export default function AnsweredWallScreen({ navigation }) {
   const [stones, setStones]         = useState([]);
@@ -50,26 +50,37 @@ export default function AnsweredWallScreen({ navigation }) {
 
   function renderStone({ item }) {
     const catColor = colors[item.category] || colors.gold;
+    const catBg = getCategoryBg(item.category);
     const date = new Date(item.answered_at || item.created_at).toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric'
     });
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, { backgroundColor: catBg }]}
         onPress={() => navigation.navigate('StoneDetail', { stone: item })}
         activeOpacity={0.85}
       >
         <View style={[styles.stripe, { backgroundColor: catColor }]} />
         <View style={styles.cardContent}>
           <View style={styles.cardHeader}>
-            <Text style={styles.dove}>🕊️</Text>
+            {item.avatar_url
+              ? <Image source={{ uri: item.avatar_url }} style={[styles.avatar, { borderColor: catColor }]} />
+              : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: catColor }]}>
+                  <Text style={styles.avatarText}>
+                    {(item.display_name || '?')[0].toUpperCase()}
+                  </Text>
+                </View>
+              )
+            }
             <View style={styles.cardHeaderText}>
               <Text style={styles.ownerName}>{item.display_name}</Text>
-              <Text style={styles.cardMeta}>
+              <Text style={[styles.cardMeta, { color: catColor }]}>
                 {CATEGORY_LABELS[item.category]} · Answered {date}
               </Text>
             </View>
+            <Text style={styles.dove}>🕊️</Text>
           </View>
           <Text style={styles.stoneText} numberOfLines={4}>{item.text}</Text>
           <View style={styles.cardFooter}>
@@ -105,10 +116,12 @@ export default function AnsweredWallScreen({ navigation }) {
             }
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.4}
-            contentContainerStyle={{ paddingBottom: spacing.xxl }}
+            contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl }}
             ListFooterComponent={hasMore
               ? <ActivityIndicator style={{ padding: spacing.lg }} color={colors.gold} />
-              : <Text style={styles.endText}>— End of Answered Prayers —</Text>
+              : stones.length > 0
+                ? <Text style={styles.endText}>— End of Answered Prayers —</Text>
+                : null
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -147,7 +160,7 @@ const styles = StyleSheet.create({
   headerText: { alignItems: 'center', flex: 1 },
   title: {
     fontFamily: type.displayFont,
-    fontSize: type.displaySize,
+    fontSize: 22,
     color: colors.inkDark,
   },
   tagline: {
@@ -156,50 +169,70 @@ const styles = StyleSheet.create({
     fontSize: type.captionSize,
     color: colors.inkLight,
     marginTop: 2,
+    textAlign: 'center',
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: colors.bgCard,
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.sm,
     borderRadius: radius.md,
+    marginBottom: spacing.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...shadow.card,
   },
-  stripe: { width: 4 },
+  stripe: { width: 6 },
   cardContent: { flex: 1, padding: spacing.md },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  dove: { fontSize: 24, marginRight: spacing.sm },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: spacing.sm,
+    borderWidth: 2,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  avatarText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 16,
+    color: '#FFF',
+  },
   cardHeaderText: { flex: 1 },
+  dove: { fontSize: 28 },
   ownerName: {
     fontFamily: fonts.uiBold,
-    fontSize: type.uiSize,
+    fontSize: 15,
     color: colors.inkDark,
   },
   cardMeta: {
-    fontFamily: fonts.caption,
+    fontFamily: fonts.uiBold,
     fontSize: type.captionSize,
-    color: colors.inkLight,
     marginTop: 2,
   },
   stoneText: {
     fontFamily: fonts.body,
-    fontSize: type.uiSize,
+    fontSize: 15,
     color: colors.inkMid,
-    lineHeight: type.uiSize * 1.6,
+    lineHeight: 22,
     marginBottom: spacing.sm,
   },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   prayCount: {
-    fontFamily: fonts.caption,
+    fontFamily: fonts.uiBold,
     fontSize: type.captionSize,
     color: colors.inkLight,
   },
@@ -211,9 +244,10 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 56, marginBottom: spacing.md },
   emptyTitle: {
     fontFamily: type.displayFont,
-    fontSize: 24,
+    fontSize: 22,
     color: colors.inkDark,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptyText: {
     fontFamily: fonts.body,

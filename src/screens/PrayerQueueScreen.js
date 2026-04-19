@@ -6,17 +6,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getMyPrayers, markPrayerAnswered } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS } from '../theme';
+import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 
 export default function PrayerQueueScreen({ navigation }) {
   const { user } = useAuth();
-  const [prayers, setPrayers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [marking, setMarking]   = useState(null);
+  const [prayers, setPrayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(null);
 
-  useEffect(() => {
-    loadPrayers();
-  }, [user]);
+  useEffect(() => { loadPrayers(); }, [user]);
 
   async function loadPrayers() {
     if (!user) return;
@@ -41,12 +39,8 @@ export default function PrayerQueueScreen({ navigation }) {
             setMarking(prayer.stone_id);
             try {
               await markPrayerAnswered(user.id, prayer.stone_id);
-              // Remove from list
               setPrayers(p => p.filter(pr => pr.stone_id !== prayer.stone_id));
-              Alert.alert(
-                'Praise God! 🙌',
-                'This prayer has been marked as answered. Keep praying faithfully!',
-              );
+              Alert.alert('Praise God! 🙌', 'This prayer has been marked as answered!');
             } catch (err) {
               Alert.alert('Error', err.message || 'Could not mark as answered.');
             } finally {
@@ -65,23 +59,21 @@ export default function PrayerQueueScreen({ navigation }) {
     const stone = item.stones;
     const owner = stone?.users;
     const catColor = colors[stone?.category] || colors.gold;
+    const catBg = getCategoryBg(stone?.category);
     const isMarking = marking === item.stone_id;
     const daysAgo = item.created_at
       ? Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000)
       : 0;
 
     return (
-      <View style={s.card}>
-        {/* Category stripe */}
+      <View style={[s.card, { backgroundColor: catBg }]}>
         <View style={[s.stripe, { backgroundColor: catColor }]} />
-
         <View style={s.cardContent}>
-          {/* Header */}
           <View style={s.cardHeader}>
             {owner?.avatar_url
-              ? <Image source={{ uri: owner.avatar_url }} style={s.avatar} />
+              ? <Image source={{ uri: owner.avatar_url }} style={[s.avatar, { borderColor: catColor }]} />
               : (
-                <View style={s.avatarPlaceholder}>
+                <View style={[s.avatarPlaceholder, { backgroundColor: catColor }]}>
                   <Text style={s.avatarText}>
                     {(owner?.display_name || '?')[0].toUpperCase()}
                   </Text>
@@ -90,24 +82,20 @@ export default function PrayerQueueScreen({ navigation }) {
             }
             <View style={s.cardHeaderText}>
               <Text style={s.ownerName}>{owner?.display_name || 'Someone'}</Text>
-              <Text style={s.cardMeta}>
+              <Text style={[s.cardMeta, { color: catColor }]}>
                 {CATEGORY_LABELS[stone?.category] || 'Faith'} · Praying {daysAgo === 0 ? 'today' : `${daysAgo}d`}
               </Text>
             </View>
           </View>
-
-          {/* Stone text */}
           <Text style={s.stoneText} numberOfLines={3}>{stone?.text}</Text>
-
-          {/* Mark as answered button */}
           <TouchableOpacity
-            style={s.answeredBtn}
+            style={[s.answeredBtn, { borderColor: catColor }]}
             onPress={() => handleMarkAnswered(item)}
             disabled={isMarking}
           >
             {isMarking
-              ? <ActivityIndicator size="small" color={colors.gold} />
-              : <Text style={s.answeredBtnText}>🕊️ God Answered This</Text>
+              ? <ActivityIndicator size="small" color={catColor} />
+              : <Text style={[s.answeredBtnText, { color: catColor }]}>🕊️ God Answered This</Text>
             }
           </TouchableOpacity>
         </View>
@@ -117,8 +105,6 @@ export default function PrayerQueueScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={s.back}>← Back</Text>
@@ -200,7 +186,7 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: type.displayFont,
-    fontSize: type.displaySize,
+    fontSize: 22,
     color: colors.inkDark,
   },
   sub: {
@@ -209,13 +195,15 @@ const s = StyleSheet.create({
     fontSize: type.captionSize,
     color: colors.inkLight,
     marginTop: 2,
+    textAlign: 'center',
   },
   sectionHeader: {
     marginBottom: spacing.md,
+    alignItems: 'center',
   },
   sectionTitle: {
     fontFamily: fonts.uiBold,
-    fontSize: type.uiSize,
+    fontSize: 16,
     color: colors.inkDark,
     marginBottom: 4,
   },
@@ -224,95 +212,84 @@ const s = StyleSheet.create({
     fontSize: type.captionSize,
     color: colors.inkLight,
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: colors.bgCard,
     borderRadius: radius.md,
     marginBottom: spacing.md,
     overflow: 'hidden',
     ...shadow.card,
   },
-  stripe: {
-    width: 4,
-  },
-  cardContent: {
-    flex: 1,
-    padding: spacing.md,
-  },
+  stripe: { width: 6 },
+  cardContent: { flex: 1, padding: spacing.md },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: spacing.sm,
+    borderWidth: 2,
   },
   avatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.gold,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
-    ...shadow.gold,
   },
   avatarText: {
     fontFamily: fonts.uiBold,
-    fontSize: 14,
+    fontSize: 16,
     color: '#FFF',
   },
   cardHeaderText: { flex: 1 },
   ownerName: {
     fontFamily: fonts.uiBold,
-    fontSize: type.uiSize,
+    fontSize: 15,
     color: colors.inkDark,
   },
   cardMeta: {
-    fontFamily: fonts.caption,
+    fontFamily: fonts.uiBold,
     fontSize: type.captionSize,
-    color: colors.inkLight,
     marginTop: 2,
   },
   stoneText: {
     fontFamily: fonts.body,
-    fontSize: type.uiSize,
+    fontSize: 15,
     color: colors.inkMid,
-    lineHeight: type.uiSize * 1.6,
+    lineHeight: 22,
     marginBottom: spacing.md,
   },
   answeredBtn: {
-    backgroundColor: colors.prayGlow,
     borderRadius: radius.full,
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.gold,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   answeredBtnText: {
     fontFamily: fonts.uiBold,
     fontSize: 13,
-    color: colors.gold,
   },
   emptyContainer: {
     alignItems: 'center',
     paddingTop: spacing.xxxl,
     paddingHorizontal: spacing.xl,
   },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: spacing.md,
-  },
+  emptyIcon: { fontSize: 56, marginBottom: spacing.md },
   emptyTitle: {
     fontFamily: type.displayFont,
-    fontSize: 24,
+    fontSize: 22,
     color: colors.inkDark,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptyText: {
     fontFamily: fonts.body,
@@ -336,11 +313,13 @@ const s = StyleSheet.create({
     fontSize: type.uiSize,
     color: colors.inkDark,
     marginBottom: 4,
+    textAlign: 'center',
   },
   answeredSectionSub: {
     fontFamily: fonts.body,
     fontStyle: 'italic',
     fontSize: type.captionSize,
     color: colors.inkMid,
+    textAlign: 'center',
   },
 });

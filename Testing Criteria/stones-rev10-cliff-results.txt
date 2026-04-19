@@ -1,0 +1,61 @@
+STONES REV 10 — TEST RESULTS
+Tester: Cliff
+Date: 4/19/2026
+
+
+=== Authentication ===
+Sign Up: ✅ Pass
+  Notes: Sign up screen was good. Confirmation email did not get sent and User was not inserted into Supabase
+Sign In: ✅ Pass
+Sign Out: ✅ Pass
+
+=== Wall ===
+Wall Loads: ✅ Pass
+Category Filters: ✅ Pass
+Pray for Stone: ✅ Pass
+Mark Stone Answered: ✅ Pass
+Stone Detail: ✅ Pass
+
+=== Drop Stone ===
+Immersive Screen: ✅ Pass
+Drop Animation: ⚠️ Issue
+  Notes: Only appear on the wall after a screen pull down to refresh wall
+Edit Stone: ⚠️ Issue
+  Notes: Only appear on the wall after a screen pull down to refresh wall
+Delete Stone: ❌ Fail
+  Notes: Confirmation Delete Stone appears->Delete buttom pressed lead to Unknown error. Stome remained on wall
+
+=== Circles ===
+Create Circle: ✅ Pass
+Circle Navigation: ⚠️ Issue
+  Notes: Back button and Circles Name and Add memebr Button crammed together on screen. Need better format 
+Add Member: ❌ Fail
+  Notes: Did not appear in members lisr
+
+=== More Menu ===
+Prayer Queue: ⚠️ Issue
+  Notes: Prayer Queue needs to centered, font a little smaller to Prayer Queue text fits center on one line or centered each word over two lines
+God Answered This: ✅ Pass
+Answered Prayers Wall: ⚠️ Issue
+  Notes: Answered Prayers needs to centered, font a little smaller so Answered Prayers text fits center on one line or centered each word over two lines
+Journey: ✅ Pass
+How To Use: ⚠️ Issue
+  Notes: If possible can a back to app button be floating on the how-to-use.html page the the user can return to the app. Currently the user has to be aware that the browser page needs to be closed as the app is hidden behind it
+
+=== Profile ===
+View Profile: ✅ Pass
+Edit Profile: ✅ Pass
+Upload Avatar: ✅ Pass
+Badges: ✅ Pass
+
+=== Discover ===
+Search Users: ⚠️ Issue
+  Notes: Have only one user and name appears without the need for search. Tgis test should be included when a broader range of people will be testing
+Follow / Unfollow: ⚠️ Issue
+  Notes: Follow button pressed and changes to following,
+
+=== UI & General ===
+Tab Bar: ✅ Pass
+Category Colors: ✅ Pass
+Overall Feel: ✅ Pass
+  Notes: Good. 
