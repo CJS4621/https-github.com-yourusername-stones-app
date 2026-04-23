@@ -6,7 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors, fonts } from '../theme';
-
+import HowToScreen from '../screens/HowToScreen';
 import WallScreen          from '../screens/WallScreen';
 import JourneyScreen       from '../screens/JourneyScreen';
 import DiscoverScreen      from '../screens/DiscoverScreen';
@@ -40,9 +40,8 @@ function MoreModal({ visible, onClose, navigation }) {
     { emoji: '🕊️', label: 'Answered Prayers', screen: 'AnsweredWall' },
     { emoji: '🗺️', label: 'Journey',           screen: 'Journey' },
     { emoji: '🙏', label: 'Prayer Queue',      screen: 'PrayerQueue' },
-    { emoji: '📖', label: 'How To Use',        url: 'https://stonesapp.ca/how-to.html' },
-  ];
-
+    { emoji: '📖', label: 'How To Use', screen: 'HowTo' },
+	];
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={moreStyles.overlay} onPress={onClose}>
@@ -202,6 +201,11 @@ export default function AppNavigator() {
               component={AnsweredWallScreen}
               options={{ presentation: 'card' }}
             />
+			<RootStack.Screen
+			  name="HowTo"
+			  component={HowToScreen}
+			  options={{ presentation: 'card' }}
+			/>
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthScreen} />
