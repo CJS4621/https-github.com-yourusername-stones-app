@@ -118,15 +118,15 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
             </Text>
           </TouchableOpacity>
 
-          {(isOwner || prayed) && (
-            <TouchableOpacity
-              onPress={handleMarkAnswered}
-              style={[styles.answeredBtn, { borderColor: categoryColor }]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.answeredBtnText, { color: categoryColor }]}>🕊️ Answered</Text>
-            </TouchableOpacity>
-          )}
+			{isOwner && (
+			  <TouchableOpacity
+				onPress={handleMarkAnswered}
+				style={[styles.answeredBtn, { borderColor: categoryColor }]}
+				activeOpacity={0.7}
+			  >
+				<Text style={[styles.answeredBtnText, { color: categoryColor }]}>🕊️ Answered</Text>
+			  </TouchableOpacity>
+			)}
         </View>
       </View>
     </TouchableOpacity>

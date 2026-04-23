@@ -36,22 +36,16 @@ export default function CircleDetailScreen({ route, navigation }) {
   }, []);
 
   async function loadMembers() {
-  setLoading(true);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const data = await getCircleMembers(circle.id);
-    // Temporary debug alert
-    Alert.alert(
-      'Debug', 
-      `Session: ${sessionData?.session?.user?.id}\nMembers: ${JSON.stringify(data)}`
-    );
-    setMembers(data);
-  } catch (err) {
-    Alert.alert('Error', err.message);
-  } finally {
-    setLoading(false);
+    setLoading(true);
+    try {
+      const data = await getCircleMembers(circle.id);
+      setMembers(data);
+    } catch (err) {
+      console.log('Error loading members:', err);
+    } finally {
+      setLoading(false);
+    }
   }
-}}
 
   async function handleSearch(text) {
     setSearchQuery(text);
@@ -71,7 +65,6 @@ export default function CircleDetailScreen({ route, navigation }) {
       setShowInvite(false);
       setSearchQuery('');
       setSearchResults([]);
-      // Small delay to allow DB to commit before reloading
       setTimeout(() => loadMembers(), 500);
       Alert.alert('Member Added! 🫂', `${targetUser.display_name} has been added to ${circle.name}.`);
     } catch (err) {
@@ -215,7 +208,7 @@ export default function CircleDetailScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Header — redesigned to two rows */}
+      {/* Header — two rows */}
       <View style={s.header}>
         <View style={s.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}>

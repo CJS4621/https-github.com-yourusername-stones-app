@@ -4,6 +4,7 @@ import {
   ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import StoneCard from '../components/StoneCard';
 import { getWall } from '../lib/api';
 import { colors, fonts, type, spacing, radius } from '../theme';
@@ -35,11 +36,14 @@ export default function WallScreen({ navigation }) {
     }
   }, [category]);
 
-  useEffect(() => {
-    setLoading(true);
-    setStones([]);
-    fetchStones(1, category, true);
-  }, [category]);
+  // Refresh wall every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      setStones([]);
+      fetchStones(1, category, true);
+    }, [category])
+  );
 
   function handleRefresh() {
     setRefreshing(true);
@@ -81,13 +85,13 @@ export default function WallScreen({ navigation }) {
         <FlatList
           data={stones}
           keyExtractor={item => item.id}
-			renderItem={({ item }) => (
-			  <StoneCard
-				stone={item}
-				onPress={() => navigation.navigate('StoneDetail', { stone: item })}
-				onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
-			  />
-			)}
+          renderItem={({ item }) => (
+            <StoneCard
+              stone={item}
+              onPress={() => navigation.navigate('StoneDetail', { stone: item })}
+              onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
+            />
+          )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />
           }
