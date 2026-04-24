@@ -19,18 +19,20 @@ export default function App() {
 
   useEffect(() => {
     // Handle invalid/expired session — auto sign out
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'TOKEN_REFRESHED') return;
-      if (event === 'SIGNED_OUT') return;
-      if (!session && event !== 'INITIAL_SESSION') {
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (
+        error?.message?.includes('Refresh Token Not Found') ||
+        error?.message?.includes('Invalid Refresh Token')
+      ) {
         supabase.auth.signOut();
       }
     });
 
-    // Handle auth errors globally
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error?.message?.includes('Refresh Token Not Found') ||
-          error?.message?.includes('Invalid Refresh Token')) {
+    // Listen for auth errors on token refresh
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'SIGNED_OUT') return;
+      if (event === 'INITIAL_SESSION' && !session) {
         supabase.auth.signOut();
       }
     });
