@@ -20,6 +20,7 @@ import CircleDetailScreen  from '../screens/CircleDetailScreen';
 import AnsweredWallScreen  from '../screens/AnsweredWallScreen';
 import AuthScreen          from '../screens/AuthScreen';
 import { useAuth }         from '../context/AuthContext';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab       = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -41,6 +42,7 @@ function MoreModal({ visible, onClose, navigation }) {
     { emoji: '🗺️', label: 'Journey',           screen: 'Journey' },
     { emoji: '🙏', label: 'Prayer Queue',      screen: 'PrayerQueue' },
     { emoji: '📖', label: 'How To Use', screen: 'HowTo' },
+	{ emoji: '⚙️', label: 'Settings', screen: 'Settings' },
 	];
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -204,6 +206,11 @@ export default function AppNavigator() {
 			<RootStack.Screen
 			  name="HowTo"
 			  component={HowToScreen}
+			  options={{ presentation: 'card' }}
+			/>
+			<RootStack.Screen
+			  name="Settings"
+			  component={SettingsScreen}
 			  options={{ presentation: 'card' }}
 			/>
           </>
