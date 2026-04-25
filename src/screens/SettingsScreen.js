@@ -9,6 +9,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 
+const DONATION_LINKS = {
+  5:  'https://buy.stripe.com/00w28jeSqctf0fa0ho9IQ01',
+  10: 'https://buy.stripe.com/aFa3cnh0y8cZ6Dy0ho9IQ00',
+  25: 'https://buy.stripe.com/fZu3cn6lU50Nge8fci9IQ02',
+};
+
 export default function SettingsScreen({ navigation }) {
   const { user } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -66,8 +72,8 @@ export default function SettingsScreen({ navigation }) {
     );
   }
 
-  async function handleDonate() {
-    Linking.openURL('https://buy.stripe.com/your-stripe-link');
+  function handleDonate(amount) {
+    Linking.openURL(DONATION_LINKS[amount]);
   }
 
   function SettingRow({ icon, label, onPress, value, isSwitch, isDestructive, chevron = true }) {
@@ -121,11 +127,22 @@ export default function SettingsScreen({ navigation }) {
         {/* Support */}
         <Text style={s.sectionLabel}>Support the Ministry</Text>
         <View style={s.section}>
-          <SettingRow
-            icon="💝"
-            label="Donate to Stones"
-            onPress={handleDonate}
-          />
+          <View style={s.donateContainer}>
+            <Text style={s.donateText}>
+              Thus far the Lord has helped us. Help keep Stones running! 🪨
+            </Text>
+            <View style={s.donateRow}>
+              <TouchableOpacity style={s.donateBtn} onPress={() => handleDonate(5)}>
+                <Text style={s.donateBtnText}>☕ $5</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.donateBtn} onPress={() => handleDonate(10)}>
+                <Text style={s.donateBtnText}>🪨 $10</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.donateBtn} onPress={() => handleDonate(25)}>
+                <Text style={s.donateBtnText}>🙏 $25</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         {/* About */}
@@ -229,5 +246,32 @@ const s = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: 20,
     color: colors.inkLight,
+  },
+  donateContainer: {
+    padding: spacing.md,
+  },
+  donateText: {
+    fontFamily: fonts.ui,
+    fontSize: type.uiSize,
+    color: colors.inkLight,
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
+  donateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  donateBtn: {
+    flex: 1,
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  donateBtnText: {
+    color: '#fff',
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
   },
 });
