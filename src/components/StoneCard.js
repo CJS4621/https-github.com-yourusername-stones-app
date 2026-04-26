@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Alert, Linking } from 'react-native';
 import { colors, fonts, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 import { togglePrayer, markStoneAnswered } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -103,6 +103,21 @@ export default function StoneCard({ stone, onPress, onPressUser, initialPrayed =
 
         {/* Stone text */}
         <Text style={styles.stoneText}>{stone.text}</Text>
+
+        {/* Scripture Reference */}
+        {stone.scripture_ref && (
+          <TouchableOpacity
+            style={styles.scriptureBtn}
+            onPress={() => Linking.openURL(
+              `https://www.bible.com/search/bible?q=${encodeURIComponent(stone.scripture_ref)}`
+            )}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.scriptureBtnText, { color: categoryColor }]}>
+              📖 {stone.scripture_ref}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Photo */}
         {stone.photo_url && (
@@ -253,6 +268,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   answeredBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+  },
+  scriptureBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  scriptureBtnText: {
     fontFamily: fonts.uiBold,
     fontSize: 12,
   },

@@ -26,10 +26,11 @@ const CATEGORY_VERSES = {
 
 export default function DropStoneScreen({ navigation }) {
   const { user } = useAuth();
-  const [text, setText]         = useState('');
-  const [category, setCategory] = useState('faith');
-  const [photoUrl, setPhotoUrl] = useState(null);
-  const [saving, setSaving]     = useState(false);
+  const [text, setText]               = useState('');
+  const [category, setCategory]       = useState('faith');
+  const [photoUrl, setPhotoUrl]       = useState(null);
+  const [scriptureRef, setScriptureRef] = useState('');
+  const [saving, setSaving]           = useState(false);
 
   const stoneScale   = useRef(new Animated.Value(1)).current;
   const stoneOpacity = useRef(new Animated.Value(1)).current;
@@ -83,10 +84,11 @@ export default function DropStoneScreen({ navigation }) {
 
     try {
       await dropStone({
-        user_id:   user.id,
-        text:      text.trim(),
+        user_id:        user.id,
+        text:           text.trim(),
         category,
-        photo_url: null,
+        photo_url:      null,
+        scripture_ref:  scriptureRef.trim() || null,
       });
       setTimeout(() => navigation.goBack(), 400);
     } catch (err) {
@@ -202,6 +204,33 @@ export default function DropStoneScreen({ navigation }) {
               );
             })}
           </View>
+
+          {/* Scripture Reference */}
+          <Text style={[styles.sectionLabel, { color: categoryColor }]}>
+            Scripture Reference (Optional)
+          </Text>
+          <View style={[styles.scriptureWrapper, { borderColor: categoryColor + '40' }]}>
+            <Text style={[styles.scriptureIcon, { color: categoryColor }]}>📖</Text>
+            <TextInput
+              style={[styles.scriptureInput, { color: colors.inkDark }]}
+              placeholder="e.g. John 3:16, Psalm 23:1"
+              placeholderTextColor={categoryColor + '60'}
+              value={scriptureRef}
+              onChangeText={setScriptureRef}
+              returnKeyType="done"
+              autoCapitalize="words"
+            />
+            {scriptureRef.length > 0 && (
+              <TouchableOpacity onPress={() => setScriptureRef('')}>
+                <Text style={[styles.scriptureClear, { color: categoryColor }]}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {scriptureRef.length > 0 && (
+            <Text style={[styles.scriptureHint, { color: categoryColor }]}>
+              Readers can tap to open this verse in YouVersion 📖
+            </Text>
+          )}
 
           {/* Photo */}
           <Text style={[styles.sectionLabel, { color: categoryColor }]}>Photo (Optional)</Text>
@@ -321,6 +350,36 @@ const styles = StyleSheet.create({
   categoryChipText: {
     fontFamily: fonts.uiBold,
     fontSize: 12,
+  },
+  scriptureWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
+  },
+  scriptureIcon: { fontSize: 18 },
+  scriptureInput: {
+    flex: 1,
+    fontFamily: fonts.ui,
+    fontSize: 15,
+    paddingVertical: 4,
+  },
+  scriptureClear: {
+    fontSize: 16,
+    fontWeight: '700',
+    paddingHorizontal: 4,
+  },
+  scriptureHint: {
+    fontFamily: fonts.caption,
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginBottom: spacing.lg,
+    marginLeft: 2,
   },
   photoBtn: {
     borderWidth: 1.5,

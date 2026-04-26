@@ -16,7 +16,7 @@
 	 "ios": {
 	  "supportsTablet": true,
 	  "bundleIdentifier": "ca.stonesapp.stones",
-	  "buildNumber": "15",
+	  "buildNumber": "18",
 	  "infoPlist": {
 		"ITSAppUsesNonExemptEncryption": false
 	  }
