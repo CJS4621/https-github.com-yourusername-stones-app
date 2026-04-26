@@ -7,19 +7,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import StoneCard from '../components/StoneCard';
 import { getWall } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { colors, fonts, type, spacing, radius } from '../theme';
 import { CATEGORY_LABELS } from '../theme';
 
 const CATEGORIES = ['all', ...Object.keys(CATEGORY_LABELS)];
 
 export default function WallScreen({ navigation }) {
+  const { user } = useAuth();
   const [stones, setStones]         = useState([]);
+  const [prayedIds, setPrayedIds]   = useState(new Set());
   const [category, setCategory]     = useState('all');
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore]       = useState(true);
   const fetchingRef                 = useRef(false);
+
+  // Batch fetch all prayed stone IDs once — no per-card queries
+  async function fetchPrayedIds() {
+    if (!user) return;
+    const { data } = await supabase
+      .from('prayers')
+      .select('stone_id')
+      .eq('user_id', user.id);
+    if (data) setPrayedIds(new Set(data.map(p => p.stone_id)));
+  }
 
   const fetchStones = useCallback(async (nextPage = 1, cat = category, replace = false) => {
     if (fetchingRef.current) return;
@@ -36,17 +50,19 @@ export default function WallScreen({ navigation }) {
     }
   }, [category]);
 
-  // Refresh wall every time screen comes into focus
+  // Refresh wall and prayed IDs every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       setStones([]);
+      fetchPrayedIds();
       fetchStones(1, category, true);
     }, [category])
   );
 
   function handleRefresh() {
     setRefreshing(true);
+    fetchPrayedIds();
     fetchStones(1, category, true);
   }
 
@@ -88,6 +104,7 @@ export default function WallScreen({ navigation }) {
           renderItem={({ item }) => (
             <StoneCard
               stone={item}
+              initialPrayed={prayedIds.has(item.id)}
               onPress={() => navigation.navigate('StoneDetail', { stone: item })}
               onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
             />
