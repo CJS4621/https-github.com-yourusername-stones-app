@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Alert } from 'react-native';
 import { colors, fonts, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 import { togglePrayer, markStoneAnswered } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export default function StoneCard({ stone, onPress, onPressUser }) {
   const { user } = useAuth();
@@ -16,6 +17,21 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
   const categoryBg    = getCategoryBg(stone.category);
   const daysAgo       = getDaysAgo(stone.created_at);
   const isOwner       = user?.id === stone.user_id;
+
+  // Bug 3 Fix — check if user has already prayed for this stone on mount
+  useEffect(() => {
+    if (!user) return;
+    async function checkPrayed() {
+      const { data } = await supabase
+        .from('prayers')
+        .select('stone_id')
+        .eq('user_id', user.id)
+        .eq('stone_id', stone.id)
+        .maybeSingle();
+      if (data) setPrayed(true);
+    }
+    checkPrayed();
+  }, [user, stone.id]);
 
   async function handlePray() {
     if (!user) return;
@@ -69,11 +85,11 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
       onPress={onPress}
       activeOpacity={0.92}
     >
-      {/* Category stripe — wider and more prominent */}
+      {/* Category stripe */}
       <View style={[styles.categoryStripe, { backgroundColor: categoryColor }]} />
 
       <View style={styles.content}>
-        {/* Header */}
+        {/* Header — tapping name/avatar goes to user profile */}
         <TouchableOpacity
           style={styles.header}
           onPress={() => onPressUser && onPressUser(stone.user_id)}
@@ -93,6 +109,8 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
               {CATEGORY_LABELS[stone.category]}  ·  {daysAgo}
             </Text>
           </View>
+          {/* Bug 2 Fix — subtle hint that card is tappable to view/edit */}
+          <Text style={[styles.viewHint, { color: categoryColor }]}>View ›</Text>
         </TouchableOpacity>
 
         {/* Stone text */}
@@ -118,15 +136,15 @@ export default function StoneCard({ stone, onPress, onPressUser }) {
             </Text>
           </TouchableOpacity>
 
-			{isOwner && (
-			  <TouchableOpacity
-				onPress={handleMarkAnswered}
-				style={[styles.answeredBtn, { borderColor: categoryColor }]}
-				activeOpacity={0.7}
-			  >
-				<Text style={[styles.answeredBtnText, { color: categoryColor }]}>🕊️ Answered</Text>
-			  </TouchableOpacity>
-			)}
+          {isOwner && (
+            <TouchableOpacity
+              onPress={handleMarkAnswered}
+              style={[styles.answeredBtn, { borderColor: categoryColor }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.answeredBtnText, { color: categoryColor }]}>🕊️ Answered</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -193,6 +211,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: 11,
     marginTop: 1,
+  },
+  viewHint: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    opacity: 0.6,
+    marginLeft: spacing.sm,
   },
   stoneText: {
     fontFamily: fonts.body,

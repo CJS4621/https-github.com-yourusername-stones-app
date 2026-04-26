@@ -61,6 +61,7 @@ export default function PrayerQueueScreen({ navigation }) {
     const catColor = colors[stone?.category] || colors.gold;
     const catBg = getCategoryBg(stone?.category);
     const isMarking = marking === item.stone_id;
+    const isOwner = user?.id === stone?.user_id;   // ← THE FIX
     const daysAgo = item.created_at
       ? Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000)
       : 0;
@@ -88,16 +89,20 @@ export default function PrayerQueueScreen({ navigation }) {
             </View>
           </View>
           <Text style={s.stoneText} numberOfLines={3}>{stone?.text}</Text>
-          <TouchableOpacity
-            style={[s.answeredBtn, { borderColor: catColor }]}
-            onPress={() => handleMarkAnswered(item)}
-            disabled={isMarking}
-          >
-            {isMarking
-              ? <ActivityIndicator size="small" color={catColor} />
-              : <Text style={[s.answeredBtnText, { color: catColor }]}>🕊️ God Answered This</Text>
-            }
-          </TouchableOpacity>
+
+          {/* Only show answered button to the stone creator */}
+          {isOwner && (
+            <TouchableOpacity
+              style={[s.answeredBtn, { borderColor: catColor }]}
+              onPress={() => handleMarkAnswered(item)}
+              disabled={isMarking}
+            >
+              {isMarking
+                ? <ActivityIndicator size="small" color={catColor} />
+                : <Text style={[s.answeredBtnText, { color: catColor }]}>🕊️ God Answered This</Text>
+              }
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -128,7 +133,7 @@ export default function PrayerQueueScreen({ navigation }) {
               activePrayers.length > 0 ? (
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>🙏 Active Prayers</Text>
-                  <Text style={s.sectionSub}>Tap "God Answered This" when you see Him move</Text>
+                  <Text style={s.sectionSub}>Stones you are praying for</Text>
                 </View>
               ) : null
             }

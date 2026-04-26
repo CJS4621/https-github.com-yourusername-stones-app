@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stones",
     "slug": "stones-fresh",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,13 +13,14 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "ca.stonesapp.stones",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
+	 "ios": {
+	  "supportsTablet": true,
+	  "bundleIdentifier": "ca.stonesapp.stones",
+	  "buildNumber": "13",
+	  "infoPlist": {
+		"ITSAppUsesNonExemptEncryption": false
+	  }
+	},
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
