@@ -5,7 +5,7 @@ import {
   ScrollView, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signIn, signUp } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 
 export default function AuthScreen() {
@@ -24,11 +24,31 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        await signUp(email, password, name || email.split('@')[0]);
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { display_name: name || email.split('@')[0] },
+            emailRedirectTo: 'https://stonesapp.ca/email-confirmed.html',
+          }
+        });
+        if (error) throw error;
         setShowWelcome(true);
         return;
       } else {
-        await signIn(email, password);
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          // Friendly error message for wrong credentials
+          if (error.message.includes('Invalid login credentials')) {
+            Alert.alert(
+              'Not Found 🪨',
+              "We don't recognize those credentials. New to Stones? Tap \"Don't have an account? Sign up\" below to join our faith community!",
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          throw error;
+        }
       }
     } catch (err) {
       Alert.alert('Error', err.message);
@@ -41,8 +61,8 @@ export default function AuthScreen() {
     setShowWelcome(false);
     setMode('signin');
     Alert.alert(
-      'Check your email',
-      'We sent a confirmation link to ' + email + '. Please click it to activate your account, then sign in.',
+      'Check your email! 📧',
+      'We sent a confirmation link to ' + email + '. Please tap it to activate your account, then come back and sign in.',
       [{ text: 'OK' }]
     );
   }
