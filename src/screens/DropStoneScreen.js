@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { dropStone, uploadPhoto } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -183,11 +184,15 @@ export default function DropStoneScreen({ navigation }) {
     setSaving(true);
 
     try {
-      // Upload photo FIRST before any animation — prevents race condition
+      // Convert local file URI to base64 then upload to Cloudinary
       let finalPhotoUrl = null;
       if (photoUri) {
         setUploadingPhoto(true);
-        finalPhotoUrl = await uploadPhoto(photoUri);
+        const base64 = await readAsStringAsync(photoUri, {
+          encoding: 'base64',
+        });
+        const base64Uri = `data:image/jpeg;base64,${base64}`;
+        finalPhotoUrl = await uploadPhoto(base64Uri);
         setUploadingPhoto(false);
       }
 
