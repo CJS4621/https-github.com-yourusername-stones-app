@@ -251,10 +251,13 @@ export async function markPrayerAnswered(userId, stoneId) {
   if (error) throw error;
 }
 
-export async function editStone(stoneId, text, category) {
+export async function editStone(stoneId, text, category, scriptureRef = null, photoUrl = null) {
+  const body = { text, category };
+  if (scriptureRef !== undefined) body.scripture_ref = scriptureRef;
+  if (photoUrl !== undefined) body.photo_url = photoUrl;
   return apiFetch(`/stones/${stoneId}`, {
     method: 'PATCH',
-    body: { text, category },
+    body,
   });
 }
 
@@ -268,4 +271,11 @@ export async function markStoneAnswered(stoneId, answeredBy) {
 export async function getAnsweredWall(page = 1) {
   const params = new URLSearchParams({ page, limit: 20 });
   return apiFetch(`/stones/answered?${params}`);
+}
+
+export async function sendEncouragement(stoneId, userId) {
+  return apiFetch(`/encourage/${stoneId}`, {
+    method: 'POST',
+    body: { user_id: userId },
+  });
 }

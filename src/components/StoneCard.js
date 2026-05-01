@@ -155,13 +155,21 @@ export default function StoneCard({ stone, onPress, onPressUser, initialPrayed =
 }
 
 function getDaysAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
+  const now = new Date();
+  const created = new Date(dateStr);
+
+  // Compare by calendar date in local timezone — not raw milliseconds
+  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const createdDate = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+
+  const diffMs = nowDate - createdDate;
+  const days = Math.round(diffMs / 86400000);
+
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
   if (days < 7)  return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const styles = StyleSheet.create({
