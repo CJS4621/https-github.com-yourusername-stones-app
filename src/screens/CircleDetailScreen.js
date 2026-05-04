@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Modal, Alert, Image, ScrollView, TextInput
+  ActivityIndicator, Modal, Alert, Image, ScrollView, TextInput,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle } from '../lib/api';
+import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto } from '../lib/api';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
@@ -20,11 +22,17 @@ async function searchUsers(query) {
 }
 
 export default function CircleDetailScreen({ route, navigation }) {
-  const { circle, role } = route.params;
+  const { circle: initialCircle, role } = route.params;
   const { user } = useAuth();
+  const [currentCircle, setCurrentCircle] = useState(initialCircle);
   const [members, setMembers]             = useState([]);
   const [loading, setLoading]             = useState(true);
   const [showInvite, setShowInvite]       = useState(false);
+  const [showEdit, setShowEdit]           = useState(false);
+  const [editName, setEditName]           = useState(initialCircle.name);
+  const [editLogo, setEditLogo]           = useState(initialCircle.logo_url || null);
+  const [editLogoUploading, setEditLogoUploading] = useState(false);
+  const [saving, setSaving]               = useState(false);
   const [searchQuery, setSearchQuery]     = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [inviting, setInviting]           = useState(null);
@@ -38,12 +46,50 @@ export default function CircleDetailScreen({ route, navigation }) {
   async function loadMembers() {
     setLoading(true);
     try {
-      const data = await getCircleMembers(circle.id);
+      const data = await getCircleMembers(currentCircle.id);
       setMembers(data);
     } catch (err) {
       console.log('Error loading members:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handlePickEditLogo() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+      base64: true,
+    });
+    if (result.canceled) return;
+    setEditLogoUploading(true);
+    try {
+      const base64Uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      const url = await uploadPhoto(base64Uri);
+      setEditLogo(url);
+    } catch (err) {
+      Alert.alert('Error', 'Could not upload photo.');
+    } finally {
+      setEditLogoUploading(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editName.trim()) { Alert.alert('Required', 'Please enter a circle name.'); return; }
+    setSaving(true);
+    try {
+      await editCircle(currentCircle.id, editName.trim(), editLogo);
+      setCurrentCircle(prev => ({ ...prev, name: editName.trim(), logo_url: editLogo }));
+      setShowEdit(false);
+      Alert.alert('Updated! 🫂', 'Circle details have been updated.');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not update circle.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -61,12 +107,12 @@ export default function CircleDetailScreen({ route, navigation }) {
   async function handleInvite(targetUser) {
     setInviting(targetUser.id);
     try {
-      await inviteToCircle(circle.id, targetUser.id);
+      await inviteToCircle(currentCircle.id, targetUser.id);
       setShowInvite(false);
       setSearchQuery('');
       setSearchResults([]);
       setTimeout(() => loadMembers(), 500);
-      Alert.alert('Member Added! 🫂', `${targetUser.display_name} has been added to ${circle.name}.`);
+      Alert.alert('Member Added! 🫂', `${targetUser.display_name} has been added to ${currentCircle.name}.`);
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not add member.');
     } finally {
@@ -77,7 +123,7 @@ export default function CircleDetailScreen({ route, navigation }) {
   async function handleLeave() {
     Alert.alert(
       'Leave Circle',
-      `Are you sure you want to leave ${circle.name}?`,
+      `Are you sure you want to leave ${currentCircle.name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -85,7 +131,7 @@ export default function CircleDetailScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await leaveCircle(circle.id, user.id);
+              await leaveCircle(currentCircle.id, user.id);
               navigation.goBack();
             } catch (err) {
               Alert.alert('Error', err.message || 'Could not leave circle.');
@@ -99,7 +145,7 @@ export default function CircleDetailScreen({ route, navigation }) {
   async function handleDelete() {
     Alert.alert(
       'Delete Circle',
-      `Are you sure you want to permanently delete "${circle.name}"? This cannot be undone.`,
+      `Are you sure you want to permanently delete "${currentCircle.name}"? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -107,7 +153,7 @@ export default function CircleDetailScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteCircle(circle.id);
+              await deleteCircle(currentCircle.id);
               navigation.goBack();
             } catch (err) {
               Alert.alert('Error', err.message || 'Could not delete circle.');
@@ -144,6 +190,68 @@ export default function CircleDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
+
+      {/* Edit Circle Modal */}
+      <Modal visible={showEdit} animationType="slide" transparent onRequestClose={() => setShowEdit(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <Text style={s.modalTitle}>Edit Circle ✏️</Text>
+
+              <View style={{ height: spacing.md }} />
+
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={s.logoPickerBtn} onPress={handlePickEditLogo}>
+                  {editLogoUploading
+                    ? <ActivityIndicator color={colors.gold} />
+                    : editLogo
+                      ? <>
+                          <Image source={{ uri: editLogo }} style={s.logoPreview} />
+                          <View style={s.logoEditOverlay}>
+                            <Text style={s.logoEditOverlayText}>✏️ Edit</Text>
+                          </View>
+                        </>
+                      : <Text style={s.logoPickerText}>📷 Add Photo</Text>
+                  }
+                </TouchableOpacity>
+
+                <Text style={s.editFieldLabel}>Circle Name</Text>
+                <TextInput
+                  style={s.editNameInput}
+                  placeholder="Circle name"
+                  placeholderTextColor={colors.inkLight}
+                  value={editName}
+                  onChangeText={setEditName}
+                  autoCapitalize="words"
+                  maxLength={50}
+                  autoFocus
+                />
+
+                <View style={{ height: spacing.lg }} />
+
+                <TouchableOpacity
+                  style={[s.modalBtn, saving && { opacity: 0.6 }]}
+                  onPress={handleSaveEdit}
+                  disabled={saving}
+                >
+                  {saving
+                    ? <ActivityIndicator color="#FFF" />
+                    : <Text style={s.modalBtnText}>💾 Save Changes</Text>
+                  }
+                </TouchableOpacity>
+
+                <View style={{ height: spacing.md }} />
+
+                <TouchableOpacity style={s.modalCancelBtnFull} onPress={() => setShowEdit(false)}>
+                  <Text style={s.modalCancelBtnFullText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: spacing.md }} />
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Invite Modal */}
       <Modal visible={showInvite} animationType="slide" transparent onRequestClose={() => setShowInvite(false)}>
@@ -214,28 +322,35 @@ export default function CircleDetailScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={s.back}>← Back</Text>
           </TouchableOpacity>
-          {isAdmin && members.length < 12 && (
-            <TouchableOpacity style={s.addMemberBtn} onPress={() => setShowInvite(true)}>
-              <Text style={s.addMemberBtnText}>+ Add Member</Text>
-            </TouchableOpacity>
-          )}
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {isAdmin && (
+              <TouchableOpacity style={s.editCircleBtn} onPress={() => setShowEdit(true)}>
+                <Text style={s.editCircleBtnText}>✏️ Edit</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && members.length < 12 && (
+              <TouchableOpacity style={s.addMemberBtn} onPress={() => setShowInvite(true)}>
+                <Text style={s.addMemberBtnText}>+ Add Member</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <Text style={s.headerTitle}>{circle.name}</Text>
+        <Text style={s.headerTitle}>{currentCircle.name}</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
 
         {/* Circle Hero */}
         <View style={s.hero}>
-          {circle.logo_url
-            ? <Image source={{ uri: circle.logo_url }} style={s.heroLogo} />
+          {currentCircle.logo_url
+            ? <Image source={{ uri: currentCircle.logo_url }} style={s.heroLogo} />
             : (
               <View style={s.heroLogoPlaceholder}>
-                <Text style={s.heroLogoText}>{(circle.name || '?')[0].toUpperCase()}</Text>
+                <Text style={s.heroLogoText}>{(currentCircle.name || '?')[0].toUpperCase()}</Text>
               </View>
             )
           }
-          <Text style={s.heroName}>{circle.name}</Text>
+          <Text style={s.heroName}>{currentCircle.name}</Text>
           <Text style={s.heroMeta}>{members.length} of 12 Members</Text>
         </View>
 
@@ -307,6 +422,77 @@ const s = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: 12,
     color: '#FFF',
+  },
+  editFieldLabel: {
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    color: colors.inkLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  editNameInput: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontFamily: fonts.ui,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    marginBottom: spacing.lg,
+  },
+  modalCancelBtnFull: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  modalCancelBtnFullText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: colors.inkMid,
+  },
+  editCircleBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    borderRadius: radius.full,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+  },
+  editCircleBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    color: colors.gold,
+  },
+  logoPickerBtn: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: colors.bgCard, borderWidth: 2,
+    borderColor: colors.border, borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+    alignSelf: 'center', marginBottom: spacing.lg, overflow: 'hidden',
+  },
+  logoEditOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  logoEditOverlayText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    color: '#FFF',
+  },
+  logoPreview: { width: 88, height: 88, borderRadius: 44 },
+  logoPickerText: {
+    fontFamily: fonts.ui, fontSize: 12,
+    color: colors.inkLight, textAlign: 'center',
   },
   scroll: { paddingBottom: spacing.xxl },
   hero: {
@@ -438,13 +624,15 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.xl,
     width: '100%',
+    marginTop: 60,
     ...shadow.gold,
   },
   modalTitle: {
     fontFamily: type.displayFont,
-    fontSize: 24,
+    fontSize: 22,
     color: colors.inkDark,
     marginBottom: 4,
+    textAlign: 'center',
   },
   modalSubtitle: {
     fontFamily: fonts.caption,
@@ -524,5 +712,31 @@ const s = StyleSheet.create({
     fontFamily: fonts.ui,
     fontSize: type.uiSize,
     color: colors.inkLight,
+  },
+  modalBtn: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.full,
+    padding: spacing.md,
+    alignItems: 'center',
+    width: '100%',
+    ...shadow.gold,
+  },
+  modalBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: '#FFF',
+  },
+  modalCancelBtnFull: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    padding: spacing.md,
+    alignItems: 'center',
+    width: '100%',
+  },
+  modalCancelBtnFullText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: colors.inkMid,
   },
 });

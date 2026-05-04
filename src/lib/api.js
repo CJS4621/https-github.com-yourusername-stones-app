@@ -279,3 +279,10 @@ export async function sendEncouragement(stoneId, userId) {
     body: { user_id: userId },
   });
 }
+
+export async function editCircle(circleId, name, logoUrl = null) {
+  return apiFetch(`/circles/${circleId}`, {
+    method: 'PATCH',
+    body: { name, logo_url: logoUrl },
+  });
+}
