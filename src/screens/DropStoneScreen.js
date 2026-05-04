@@ -10,7 +10,7 @@ import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { dropStone, uploadPhoto } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { colors, fonts, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
+import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 
 const CHAR_LIMIT = 500;
 
@@ -418,16 +418,30 @@ export default function DropStoneScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity
-              style={[styles.versePickerBtn, { borderColor: categoryColor + '60' }]}
-              onPress={() => setShowVersePicker(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.versePickerBtnText, { color: categoryColor }]}>
-                📖 Find a verse by topic...
-              </Text>
-              <Text style={[styles.versePickerArrow, { color: categoryColor }]}>›</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.versePickerBtn,
+                  { borderColor: categoryColor + '60' },
+                  !text.trim() && styles.versePickerBtnDisabled
+                ]}
+                onPress={() => text.trim() ? setShowVersePicker(true) : null}
+                activeOpacity={text.trim() ? 0.7 : 1}
+              >
+                <Text style={[
+                  styles.versePickerBtnText,
+                  { color: text.trim() ? categoryColor : colors.inkLight }
+                ]}>
+                  📖 Find a verse by topic...
+                </Text>
+                <Text style={[styles.versePickerArrow, { color: text.trim() ? categoryColor : colors.inkLight }]}>›</Text>
+              </TouchableOpacity>
+              {!text.trim() && (
+                <Text style={styles.verseRequiredHint}>
+                  ✏️ Write your stone first before adding a verse
+                </Text>
+              )}
+            </>
           )}
           <Text style={[styles.verseHint, { color: categoryColor + '80' }]}>
             Readers can tap to open this verse in YouVersion
@@ -501,6 +515,17 @@ const styles = StyleSheet.create({
   selectedVerseText: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 12, color: colors.inkMid, lineHeight: 18 },
   clearBtn: { padding: 4 },
   clearBtnText: { fontSize: 16, fontWeight: '700' },
+  versePickerBtnDisabled: {
+    opacity: 0.4,
+  },
+  verseRequiredHint: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: type.captionSize,
+    color: colors.inkLight,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
   verseHint: { fontFamily: fonts.caption, fontSize: 11, fontStyle: 'italic', marginBottom: spacing.lg, marginLeft: 2 },
   photoBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: radius.md, padding: spacing.md, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.4)' },
   photoBtnText: { fontFamily: fonts.ui, fontSize: 14 },
