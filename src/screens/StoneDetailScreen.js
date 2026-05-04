@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS } from '../theme';
-import { editStone, deleteStone, uploadPhoto, sendEncouragement } from '../lib/api';
+import { editStone, deleteStone, uploadPhoto, sendEncouragement, markStoneAnswered, dropStone } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 const VERSE_TOPICS = [
@@ -207,6 +207,68 @@ export default function StoneDetailScreen({ route, navigation }) {
     } finally {
       setEncouraging(false);
     }
+  }
+
+  async function handleMarkAnswered() {
+    const isPrayerRequest = currentStone.type === 'prayer_request';
+    Alert.alert(
+      '🕊️ Mark as Answered?',
+      isPrayerRequest
+        ? 'Has God answered this prayer request? It will move to the Answered Prayer Wall.'
+        : 'Has God answered this prayer? This stone will move to the Answered Prayer Wall.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, God Answered!',
+          onPress: async () => {
+            try {
+              await markStoneAnswered(currentStone.id, user.id);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+              // If it was a prayer request, offer to convert to a Stone testimony
+              if (isPrayerRequest) {
+                Alert.alert(
+                  'Praise God! 🙌',
+                  'Would you like to share this answered prayer as a Stone testimony for the community?',
+                  [
+                    {
+                      text: 'Not Now',
+                      style: 'cancel',
+                      onPress: () => navigation.goBack(),
+                    },
+                    {
+                      text: '🪨 Drop a Stone!',
+                      onPress: async () => {
+                        try {
+                          await dropStone({
+                            user_id:       user.id,
+                            text:          currentStone.text,
+                            category:      currentStone.category,
+                            photo_url:     currentStone.photo_url || null,
+                            scripture_ref: currentStone.scripture_ref || null,
+                            type:          'stone',
+                          });
+                          Alert.alert('🪨 Stone Dropped!', 'Your testimony has been shared with the community!');
+                          navigation.goBack();
+                        } catch (err) {
+                          Alert.alert('Error', err.message || 'Could not drop stone.');
+                          navigation.goBack();
+                        }
+                      }
+                    }
+                  ]
+                );
+              } else {
+                Alert.alert('Praise God! 🙌', 'This stone has been moved to the Answered Prayer Wall!');
+                navigation.goBack();
+              }
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Could not mark as answered.');
+            }
+          }
+        }
+      ]
+    );
   }
 
   async function handleDelete() {
@@ -486,6 +548,12 @@ export default function StoneDetailScreen({ route, navigation }) {
         )}
 
         {isOwner && (
+          <TouchableOpacity style={s.answeredBtn} onPress={handleMarkAnswered}>
+            <Text style={s.answeredBtnText}>🕊️ God Answered This</Text>
+          </TouchableOpacity>
+        )}
+
+        {isOwner && (
           <TouchableOpacity style={s.deleteBtn} onPress={handleDelete}>
             <Text style={s.deleteBtnText}>Delete Stone</Text>
           </TouchableOpacity>
@@ -526,6 +594,8 @@ const s = StyleSheet.create({
   authorName: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 15, color: colors.inkMid },
   deleteBtn: { padding: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: '#E53E3E', alignItems: 'center', marginTop: spacing.md },
   deleteBtnText: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: '#E53E3E' },
+  answeredBtn: { padding: spacing.md, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.gold, alignItems: 'center', marginBottom: spacing.sm },
+  answeredBtnText: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: colors.gold },
   encourageBtn: { borderWidth: 1.5, borderColor: colors.gold, borderRadius: radius.full, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
   encourageBtnDone: { backgroundColor: '#E8F5E9', borderColor: '#2E8B57' },
   encourageBtnText: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: colors.gold },
