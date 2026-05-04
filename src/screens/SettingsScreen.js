@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Switch, Alert, Linking
+  ScrollView, Switch, Alert, Linking, AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -24,6 +24,16 @@ export default function SettingsScreen({ navigation }) {
     checkNotificationStatus();
   }, []);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        console.log('App came to foreground - checking notifications');
+        checkNotificationStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   async function checkNotificationStatus() {
     const { status } = await Notifications.getPermissionsAsync();
     setNotificationsEnabled(status === 'granted');
@@ -31,12 +41,13 @@ export default function SettingsScreen({ navigation }) {
 
   async function handleNotificationToggle(value) {
     if (value) {
+      // User wants to enable — request permission directly
       const { status } = await Notifications.requestPermissionsAsync();
       setNotificationsEnabled(status === 'granted');
-      if (status !== 'granted') {
+      if (status === 'denied') {
         Alert.alert(
-          'Notifications Disabled',
-          'Please enable notifications for Stones in your iPhone Settings.',
+          'Enable Notifications',
+          'Notifications were previously denied. Please enable them in iPhone Settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Linking.openSettings() }
@@ -44,14 +55,8 @@ export default function SettingsScreen({ navigation }) {
         );
       }
     } else {
-      Alert.alert(
-        'Disable Notifications',
-        'To disable notifications go to iPhone Settings → Stones → Notifications.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() }
-        ]
-      );
+      // iOS doesn't allow apps to revoke — go straight to Settings
+      Linking.openSettings();
     }
   }
 
