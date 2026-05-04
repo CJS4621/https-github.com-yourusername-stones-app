@@ -32,9 +32,10 @@ async function apiFetch(path, options = {}) {
  * @param {number} page - 1-indexed page number
  * @param {string|null} category - optional category filter
  */
-export async function getWall(page = 1, category = null) {
+export async function getWall(page = 1, category = null, type = null) {
   const params = new URLSearchParams({ page, limit: 20 });
   if (category) params.append('category', category);
+  if (type) params.append('type', type);
   return apiFetch(`/stones/wall?${params}`);
 }
 

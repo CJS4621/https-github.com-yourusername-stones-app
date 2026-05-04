@@ -19,6 +19,7 @@ export default function WallScreen({ navigation }) {
   const [stones, setStones]         = useState([]);
   const [prayedIds, setPrayedIds]   = useState(new Set());
   const [category, setCategory]     = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,11 +36,11 @@ export default function WallScreen({ navigation }) {
     if (data) setPrayedIds(new Set(data.map(p => p.stone_id)));
   }
 
-  const fetchStones = useCallback(async (nextPage = 1, cat = category, replace = false) => {
+  const fetchStones = useCallback(async (nextPage = 1, cat = category, replace = false, typeFil = typeFilter) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
-      const data = await getWall(nextPage, cat === 'all' ? null : cat);
+      const data = await getWall(nextPage, cat === 'all' ? null : cat, typeFil === 'all' ? null : typeFil);
       setStones(prev => replace ? data : [...prev, ...data]);
       setHasMore(data.length === 20);
       setPage(nextPage);
@@ -48,7 +49,7 @@ export default function WallScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [category]);
+  }, [category, typeFilter]);
 
   // Refresh wall and prayed IDs every time screen comes into focus
   useFocusEffect(
@@ -56,8 +57,8 @@ export default function WallScreen({ navigation }) {
       setLoading(true);
       setStones([]);
       fetchPrayedIds();
-      fetchStones(1, category, true);
-    }, [category])
+      fetchStones(1, category, true, typeFilter);
+    }, [category, typeFilter])
   );
 
   function handleRefresh() {
@@ -76,6 +77,26 @@ export default function WallScreen({ navigation }) {
         <Text style={styles.logo}>Stones</Text>
         <Text style={styles.tagline}>"Thus far the Lord has helped us" — 1 Sam 7:12</Text>
       </View>
+      {/* Type Filter */}
+      <View style={styles.typeFilterRow}>
+        {[
+          { key: 'all', label: '✨ All' },
+          { key: 'stone', label: '🪨 Stones' },
+          { key: 'prayer_request', label: '🙏 Prayer Requests' },
+        ].map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.typeChip, typeFilter === key && styles.typeChipActive]}
+            onPress={() => setTypeFilter(key)}
+          >
+            <Text style={[styles.typeChipText, typeFilter === key && styles.typeChipTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Category chips */}
       <View style={styles.chipsWrapper}>
         <ScrollView
           horizontal
@@ -153,6 +174,37 @@ const styles = StyleSheet.create({
     color: colors.inkLight,
     marginTop: 2,
   },
+  typeFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  typeChip: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeChipActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  typeChipText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    color: colors.inkMid,
+    textAlign: 'center',
+    width: '100%',
+  },
+  typeChipTextActive: { color: '#FFF' },
   chipsWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
