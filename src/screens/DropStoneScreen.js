@@ -122,6 +122,7 @@ const VERSE_TOPICS = [
 export default function DropStoneScreen({ navigation }) {
   const { user } = useAuth();
   const [text, setText]                     = useState('');
+  const [stoneType, setStoneType]           = useState('stone');
   const [category, setCategory]             = useState('faith');
   const [photoUri, setPhotoUri]             = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -214,6 +215,7 @@ export default function DropStoneScreen({ navigation }) {
         category,
         photo_url:     finalPhotoUrl,
         scripture_ref: scriptureRef || null,
+        type:          stoneType,
       });
       setTimeout(() => navigation.goBack(), 400);
     } catch (err) {
@@ -309,7 +311,7 @@ export default function DropStoneScreen({ navigation }) {
           <Animated.Text style={[
             styles.stoneIcon,
             { transform: [{ scale: stoneScale }], opacity: stoneOpacity }
-          ]}>🪨</Animated.Text>
+          ]}>{stoneType === 'prayer_request' ? '🙏' : '🪨'}</Animated.Text>
           <TouchableOpacity
             style={[styles.dropBtn, { backgroundColor: categoryColor }, (!text.trim() || saving) && styles.dropBtnDisabled]}
             onPress={handleDrop}
@@ -317,8 +319,30 @@ export default function DropStoneScreen({ navigation }) {
           >
             {saving
               ? <ActivityIndicator size="small" color="#FFF" />
-              : <Text style={styles.dropBtnText}>Drop</Text>
+              : <Text style={styles.dropBtnText}>{stoneType === 'prayer_request' ? 'Post' : 'Drop'}</Text>
             }
+          </TouchableOpacity>
+        </View>
+
+        {/* Type Toggle */}
+        <View style={[styles.typeToggle, { borderBottomColor: categoryColor + '30' }]}>
+          <TouchableOpacity
+            style={[styles.typeBtn, stoneType === 'stone' && { backgroundColor: categoryColor }]}
+            onPress={() => setStoneType('stone')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.typeBtnText, stoneType === 'stone' && { color: '#FFF' }]}>
+              🪨 Stone
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.typeBtn, stoneType === 'prayer_request' && { backgroundColor: categoryColor }]}
+            onPress={() => setStoneType('prayer_request')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.typeBtnText, stoneType === 'prayer_request' && { color: '#FFF' }]}>
+              🙏 Prayer Request
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -342,7 +366,7 @@ export default function DropStoneScreen({ navigation }) {
           <View style={[styles.inputWrapper, { borderColor: categoryColor + '40' }]}>
             <TextInput
               style={styles.input}
-              placeholder="Where did you see God move..."
+              placeholder={stoneType === 'prayer_request' ? 'What do you need prayer for...' : 'Where did you see God move...'}
               placeholderTextColor={categoryColor + '60'}
               multiline
               maxLength={CHAR_LIMIT}
@@ -438,6 +462,27 @@ const styles = StyleSheet.create({
   dropBtnDisabled: { opacity: 0.4 },
   dropBtnText: { fontFamily: fonts.uiBold, fontSize: 14, color: '#FFF' },
   body: { padding: spacing.md, paddingBottom: spacing.xxl },
+  typeToggle: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  typeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  typeBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.inkMid,
+  },
   verseContainer: { alignItems: 'center', marginBottom: spacing.lg, paddingHorizontal: spacing.md, width: '100%' },
   verse: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 4 },
   verseRef: { fontFamily: fonts.uiBold, fontSize: 12, textAlign: 'center' },

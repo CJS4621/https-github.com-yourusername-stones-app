@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { readAsStringAsync } from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS } from '../theme';
 import { editStone, deleteStone, uploadPhoto, sendEncouragement } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -199,7 +200,8 @@ export default function StoneDetailScreen({ route, navigation }) {
     try {
       await sendEncouragement(currentStone.id, user.id);
       setEncouraged(true);
-      Alert.alert('💌 Encouragement Sent!', 'The stone owner has been notified!');
+      // Swoosh feeling — success notification haptic instead of alert
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not send encouragement.');
     } finally {
@@ -476,8 +478,8 @@ export default function StoneDetailScreen({ route, navigation }) {
           >
             {encouraging
               ? <ActivityIndicator color={colors.gold} />
-              : <Text style={s.encourageBtnText}>
-                  {encouraged ? '💌 Encouraged!' : '💌 Encourage'}
+              : <Text style={encouraged ? s.encourageBtnTextDone : s.encourageBtnText}>
+                  {encouraged ? '✅ Encouraged' : '💌 Encourage'}
                 </Text>
             }
           </TouchableOpacity>
@@ -525,8 +527,9 @@ const s = StyleSheet.create({
   deleteBtn: { padding: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: '#E53E3E', alignItems: 'center', marginTop: spacing.md },
   deleteBtnText: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: '#E53E3E' },
   encourageBtn: { borderWidth: 1.5, borderColor: colors.gold, borderRadius: radius.full, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
-  encourageBtnDone: { backgroundColor: colors.prayGlow },
+  encourageBtnDone: { backgroundColor: '#E8F5E9', borderColor: '#2E8B57' },
   encourageBtnText: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: colors.gold },
+  encourageBtnTextDone: { fontFamily: fonts.uiBold, fontSize: type.uiSize, color: '#2E8B57' },
 
   fieldLabel: { fontFamily: fonts.uiBold, fontSize: 12, color: colors.inkMid, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm },
   editHeader: {

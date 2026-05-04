@@ -16,6 +16,7 @@ export default function StoneCard({ stone, onPress, onPressUser, initialPrayed =
   const categoryBg    = getCategoryBg(stone.category);
   const daysAgo       = getDaysAgo(stone.created_at);
   const isOwner       = user?.id === stone.user_id;
+  const isPrayerRequest = stone.type === 'prayer_request';
 
   async function handlePray() {
     if (!user) return;
@@ -89,7 +90,14 @@ export default function StoneCard({ stone, onPress, onPressUser, initialPrayed =
               }
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.name}>{stone.display_name || 'Anonymous'}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{stone.display_name || 'Anonymous'}</Text>
+                {isPrayerRequest && (
+                  <View style={styles.prayerTag}>
+                    <Text style={styles.prayerTagText}>🙏 Prayer Request</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.meta, { color: categoryColor }]}>
                 {CATEGORY_LABELS[stone.category]}  ·  {daysAgo}
               </Text>
@@ -135,7 +143,7 @@ export default function StoneCard({ stone, onPress, onPressUser, initialPrayed =
               {prayed ? '🙏' : '🤲'}
             </Animated.Text>
             <Text style={[styles.prayCount, prayed && { color: categoryColor }]}>
-              {prayCount > 0 ? prayCount : 'Pray'}
+              {prayCount > 0 ? prayCount : isPrayerRequest ? 'Pray' : 'Pray'}
             </Text>
           </TouchableOpacity>
 
@@ -214,10 +222,31 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   headerText: { flex: 1 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
   name: {
     fontFamily: fonts.uiBold,
     fontSize: 14,
     color: colors.inkDark,
+  },
+  prayerTag: {
+    backgroundColor: '#EBF8FF',
+    borderRadius: radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#90CDF4',
+  },
+  prayerTagText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 9,
+    color: '#2B6CB0',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   meta: {
     fontFamily: fonts.uiBold,

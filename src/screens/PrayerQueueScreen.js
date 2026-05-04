@@ -27,6 +27,23 @@ export default function PrayerQueueScreen({ navigation }) {
     }
   }
 
+async function loadPrayers() {
+  if (!user) return;
+  setLoading(true);
+  try {
+    const data = await getMyPrayers(user.id);
+    console.log('Prayers loaded:', JSON.stringify(data));
+    setPrayers(data);
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+
+
+
+
   async function handleMarkAnswered(prayer) {
     Alert.alert(
       '🕊️ Mark as Answered?',
