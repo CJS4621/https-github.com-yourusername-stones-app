@@ -103,12 +103,13 @@ export async function getMyPrayers(userId) {
   if (prayerError) throw prayerError;
   if (!prayerData || prayerData.length === 0) return [];
 
-  // Step 2: get the stones for those prayer records
+  // Step 2: get the stones for those prayer records — exclude user's own stones
   const stoneIds = prayerData.map(p => p.stone_id);
   const { data: stonesData, error: stonesError } = await supabase
     .from('stones')
     .select('id, text, category, created_at, user_id')
-    .in('id', stoneIds);
+    .in('id', stoneIds)
+    .neq('user_id', userId);  // ← exclude own stones
 
   if (stonesError) throw stonesError;
 
@@ -119,19 +120,22 @@ export async function getMyPrayers(userId) {
     .select('id, display_name')
     .in('id', userIds);
 
-  // Combine everything
-  return prayerData.map(p => {
-    const stone = stonesData.find(s => s.id === p.stone_id);
-    const user = usersData?.find(u => u.id === stone?.user_id);
-    return {
-      stone_id: p.stone_id,
-      created_at: p.created_at,
-      stones: {
-        ...stone,
-        users: { display_name: user?.display_name || 'Someone' }
-      }
-    };
-  });
+  // Combine everything — filter out any prayers where stone wasn't returned (own stones excluded)
+  return prayerData
+    .map(p => {
+      const stone = stonesData.find(s => s.id === p.stone_id);
+      if (!stone) return null;
+      const user = usersData?.find(u => u.id === stone?.user_id);
+      return {
+        stone_id: p.stone_id,
+        created_at: p.created_at,
+        stones: {
+          ...stone,
+          users: { display_name: user?.display_name || 'Someone' }
+        }
+      };
+    })
+    .filter(Boolean);
 }
 
 

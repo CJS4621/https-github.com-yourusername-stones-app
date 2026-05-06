@@ -15,6 +15,31 @@ export default function AuthScreen() {
   const [name, setName]               = useState('');
   const [loading, setLoading]         = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [resetSent, setResetSent]     = useState(false);
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address above first.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'https://stonesapp.ca/reset-password.html',
+      });
+      if (error) throw error;
+      setResetSent(true);
+      Alert.alert(
+        'Password Reset Sent 📧',
+        `We sent a password reset link to ${email}. Check your inbox!`,
+        [{ text: 'OK' }]
+      );
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!email || !password) {
@@ -38,11 +63,10 @@ export default function AuthScreen() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
-          // Friendly error message for wrong credentials
           if (error.message.includes('Invalid login credentials')) {
             Alert.alert(
-              'Not Found 🪨',
-              "We don't recognize those credentials. New to Stones? Tap \"Don't have an account? Sign up\" below to join our faith community!",
+              'Credentials Not Recognised',
+              "We don't recognize those credentials.\n\nNew to Stones? Tap \"Don't have an account? Sign up\" below to join our faith community!\n\nForgotten your password? Tap \"Forgot Password?\" below.",
               [{ text: 'OK' }]
             );
             return;
@@ -170,6 +194,12 @@ export default function AuthScreen() {
                 }
               </Text>
             </TouchableOpacity>
+
+            {mode === 'signin' && (
+              <TouchableOpacity onPress={handleForgotPassword} disabled={loading}>
+                <Text style={s.forgotPassword}>Forgot your password?</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <Text style={s.footer}>A place to remember God's faithfulness</Text>
@@ -262,6 +292,14 @@ const s = StyleSheet.create({
     color: colors.gold,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+  forgotPassword: {
+    fontFamily: fonts.ui,
+    fontSize: type.captionSize,
+    color: colors.inkLight,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    textDecorationLine: 'underline',
   },
   footer: {
     fontFamily: fonts.body,
