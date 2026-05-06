@@ -291,3 +291,10 @@ export async function editCircle(circleId, name, logoUrl = null) {
     body: { name, logo_url: logoUrl },
   });
 }
+
+export async function createCustomDonation(amount) {
+  return apiFetch('/stripe/checkout', {
+    method: 'POST',
+    body: { amount },
+  });
+}

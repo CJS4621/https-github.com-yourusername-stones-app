@@ -1,24 +1,51 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Switch, Alert, Linking, AppState
+  ScrollView, Switch, Alert, Linking, AppState,
+  Modal, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { createCustomDonation } from '../lib/api';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 
 const DONATION_LINKS = {
-  5:  'https://buy.stripe.com/00w28jeSqctf0fa0ho9IQ01',
-  10: 'https://buy.stripe.com/aFa3cnh0y8cZ6Dy0ho9IQ00',
-  25: 'https://buy.stripe.com/fZu3cn6lU50Nge8fci9IQ02',
+  5:   'https://buy.stripe.com/00w28jeSqctf0fa0ho9IQ01',
+  10:  'https://buy.stripe.com/aFa3cnh0y8cZ6Dy0ho9IQ00',
+  25:  'https://buy.stripe.com/fZu3cn6lU50Nge8fci9IQ02',
+  other: 'https://buy.stripe.com/fZu3cn6lU50Nge8fci9IQ02',
 };
 
 export default function SettingsScreen({ navigation }) {
   const { user } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showCustomDonate, setShowCustomDonate] = useState(false);
+  const [customAmount, setCustomAmount] = useState('');
+  const [donating, setDonating] = useState(false);
+
+  async function handleCustomDonate() {
+    const amount = parseFloat(customAmount);
+    if (!amount || amount < 1) {
+      Alert.alert('Invalid Amount', 'Please enter an amount of at least $1.');
+      return;
+    }
+    setDonating(true);
+    try {
+      const result = await createCustomDonation(amount);
+      if (result.url) {
+        setShowCustomDonate(false);
+        setCustomAmount('');
+        Linking.openURL(result.url);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not create donation. Please try again.');
+    } finally {
+      setDonating(false);
+    }
+  }
 
   useEffect(() => {
     checkNotificationStatus();
@@ -108,6 +135,48 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
+
+      {/* Custom Donation Modal */}
+      <Modal visible={showCustomDonate} animationType="slide" transparent onRequestClose={() => setShowCustomDonate(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <Text style={s.modalIcon}>💝</Text>
+              <Text style={s.modalTitle}>Choose Your Amount</Text>
+              <Text style={s.modalSubtitle}>Thus far the Lord has helped us. Thank you for supporting Stones! 🪨</Text>
+
+              <View style={s.amountWrapper}>
+                <Text style={s.dollarSign}>$</Text>
+                <TextInput
+                  style={s.amountInput}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.inkLight}
+                  value={customAmount}
+                  onChangeText={setCustomAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+                <Text style={s.cadLabel}>CAD</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[s.modalDonateBtn, donating && { opacity: 0.6 }]}
+                onPress={handleCustomDonate}
+                disabled={donating}
+              >
+                {donating
+                  ? <ActivityIndicator color="#FFF" />
+                  : <Text style={s.modalDonateBtnText}>💳 Donate ${customAmount || '0'} CAD</Text>
+                }
+              </TouchableOpacity>
+
+              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShowCustomDonate(false)}>
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={s.back}>← Back</Text>
@@ -136,7 +205,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={s.donateText}>
               Thus far the Lord has helped us. Help keep Stones running! 🪨
             </Text>
-            <View style={s.donateRow}>
+            <View style={s.donateGrid}>
               <TouchableOpacity style={s.donateBtn} onPress={() => handleDonate(5)}>
                 <Text style={s.donateBtnText}>☕ $5</Text>
               </TouchableOpacity>
@@ -145,6 +214,9 @@ export default function SettingsScreen({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity style={s.donateBtn} onPress={() => handleDonate(25)}>
                 <Text style={s.donateBtnText}>🙏 $25</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.donateBtn} onPress={() => setShowCustomDonate(true)}>
+                <Text style={s.donateBtnText}>💝 Other</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -262,21 +334,107 @@ const s = StyleSheet.create({
     marginBottom: spacing.md,
     lineHeight: 20,
   },
-  donateRow: {
+  donateGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   donateBtn: {
-    flex: 1,
+    width: '48%',
     backgroundColor: colors.gold,
     borderRadius: radius.md,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   donateBtnText: {
     color: '#fff',
     fontFamily: fonts.uiBold,
+    fontSize: 13,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    width: '100%',
+    alignItems: 'center',
+    ...shadow.gold,
+  },
+  modalIcon: { fontSize: 48, marginBottom: spacing.sm },
+  modalTitle: {
+    fontFamily: type.displayFont,
+    fontSize: 22,
+    color: colors.inkDark,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: colors.inkLight,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 18,
+  },
+  amountWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
+  dollarSign: {
+    fontFamily: fonts.uiBold,
+    fontSize: 28,
+    color: colors.gold,
+    marginRight: 4,
+  },
+  amountInput: {
+    flex: 1,
+    fontFamily: fonts.uiBold,
+    fontSize: 28,
+    color: colors.inkDark,
+    paddingVertical: 4,
+  },
+  cadLabel: {
+    fontFamily: fonts.uiBold,
+    fontSize: 14,
+    color: colors.inkLight,
+    marginLeft: 4,
+  },
+  modalDonateBtn: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.full,
+    padding: spacing.md,
+    alignItems: 'center',
+    width: '100%',
+    ...shadow.gold,
+  },
+  modalDonateBtnText: {
+    fontFamily: fonts.uiBold,
     fontSize: type.uiSize,
+    color: '#FFF',
+  },
+  modalCancelBtn: {
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  modalCancelText: {
+    fontFamily: fonts.ui,
+    fontSize: type.uiSize,
+    color: colors.inkLight,
   },
 });
