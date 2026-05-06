@@ -510,16 +510,28 @@ export default function StoneDetailScreen({ route, navigation }) {
         <Text style={s.category}>{CATEGORY_LABELS[currentStone.category]}</Text>
         <Text style={s.text}>{currentStone.text}</Text>
 
-        {currentStone.scripture_ref && (
-          <TouchableOpacity
-            style={s.scriptureBlock}
-            onPress={() => Linking.openURL(`https://www.bible.com/search/bible?q=${encodeURIComponent(currentStone.scripture_ref)}`)}
-            activeOpacity={0.7}
-          >
-            <Text style={s.scriptureRef}>📖 {currentStone.scripture_ref}</Text>
-            <Text style={s.scriptureHint}>Tap to open in YouVersion</Text>
-          </TouchableOpacity>
-        )}
+        {currentStone.scripture_ref && (() => {
+          // Find verse text from VERSE_TOPICS
+          let verseText = '';
+          for (const topic of VERSE_TOPICS) {
+            const found = topic.verses.find(v => v.ref === currentStone.scripture_ref);
+            if (found) { verseText = found.text; break; }
+          }
+          return (
+            <View style={s.scriptureBlock}>
+              <Text style={s.scriptureRef}>📖 {currentStone.scripture_ref}</Text>
+              {verseText ? (
+                <Text style={s.scriptureText}>"{verseText}"</Text>
+              ) : null}
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`https://www.bible.com/search/bible?q=${encodeURIComponent(currentStone.scripture_ref)}`)}
+                style={s.scriptureYouVersion}
+              >
+                <Text style={s.scriptureYouVersionText}>Read in YouVersion ↗</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         <Text style={s.date}>
           {new Date(currentStone.created_at).toLocaleDateString('en-US', {
@@ -587,8 +599,10 @@ const s = StyleSheet.create({
   category: { fontFamily: fonts.uiBold, fontSize: 12, color: colors.gold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.md },
   text: { fontFamily: fonts.body, fontSize: 22, color: colors.inkDark, lineHeight: 34, marginBottom: spacing.lg },
   scriptureBlock: { backgroundColor: colors.prayGlow, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderLeftWidth: 3, borderLeftColor: colors.gold },
-  scriptureRef: { fontFamily: fonts.uiBold, fontSize: 14, color: colors.gold, marginBottom: 4 },
-  scriptureHint: { fontFamily: fonts.caption, fontSize: 11, color: colors.inkLight, fontStyle: 'italic' },
+  scriptureRef: { fontFamily: fonts.uiBold, fontSize: 14, color: colors.gold, marginBottom: 8 },
+  scriptureText: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 15, color: colors.inkDark, lineHeight: 22, marginBottom: 8 },
+  scriptureYouVersion: { marginTop: 4 },
+  scriptureYouVersionText: { fontFamily: fonts.caption, fontSize: 11, color: colors.gold, fontStyle: 'italic' },
   date: { fontFamily: fonts.caption, fontSize: 13, color: colors.inkLight, marginBottom: spacing.sm },
   author: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginBottom: spacing.xl },
   authorName: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 15, color: colors.inkMid },
