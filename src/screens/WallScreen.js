@@ -24,7 +24,118 @@ export default function WallScreen({ navigation }) {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore]       = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const fetchingRef                 = useRef(false);
+
+  // Group stones by year-month with current month always expanded
+  const groupedItems = React.useMemo(() => {
+    if (!stones.length) return [];
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // Group stones by year-month
+    const groups = {};
+    stones.forEach(stone => {
+      const date = new Date(stone.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const key = `${year}-${month}`;
+      if (!groups[key]) {
+        groups[key] = { year, month, stones: [], key };
+      }
+      groups[key].stones.push(stone);
+    });
+
+    // Sort groups: current month first, then descending
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+
+    // Build flat list with headers and stones
+    const items = [];
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    // Track years that need year-level rollup
+    const pastYears = {};
+    sortedGroups.forEach(g => {
+      if (g.year < currentYear) {
+        if (!pastYears[g.year]) pastYears[g.year] = [];
+        pastYears[g.year].push(g);
+      }
+    });
+
+    sortedGroups.forEach(g => {
+      const isCurrentMonth = g.year === currentYear && g.month === currentMonth;
+      const isCurrentYear = g.year === currentYear;
+      const isExpanded = isCurrentMonth || expandedGroups.has(g.key);
+
+      if (isCurrentYear) {
+        // Show month headers individually for current year
+        items.push({
+          type: 'header',
+          key: `header-${g.key}`,
+          label: `${monthNames[g.month]} ${g.year}`,
+          count: g.stones.length,
+          groupKey: g.key,
+          isCurrentMonth,
+          isExpanded,
+        });
+        if (isExpanded) {
+          g.stones.forEach(s => items.push({ type: 'stone', stone: s, key: s.id }));
+        }
+      }
+    });
+
+    // Add past years as collapsed year groups
+    Object.keys(pastYears).sort((a, b) => b - a).forEach(year => {
+      const yearKey = `year-${year}`;
+      const yearGroups = pastYears[year];
+      const totalCount = yearGroups.reduce((sum, g) => sum + g.stones.length, 0);
+      const isYearExpanded = expandedGroups.has(yearKey);
+
+      items.push({
+        type: 'yearHeader',
+        key: yearKey,
+        label: `${year}`,
+        count: totalCount,
+        groupKey: yearKey,
+        isExpanded: isYearExpanded,
+      });
+
+      if (isYearExpanded) {
+        yearGroups.forEach(g => {
+          const isExpanded = expandedGroups.has(g.key);
+          items.push({
+            type: 'header',
+            key: `header-${g.key}`,
+            label: `${monthNames[g.month]} ${g.year}`,
+            count: g.stones.length,
+            groupKey: g.key,
+            isCurrentMonth: false,
+            isExpanded,
+            indent: true,
+          });
+          if (isExpanded) {
+            g.stones.forEach(s => items.push({ type: 'stone', stone: s, key: s.id }));
+          }
+        });
+      }
+    });
+
+    return items;
+  }, [stones, expandedGroups]);
+
+  function toggleGroup(groupKey) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
 
   // Batch fetch all prayed stone IDs once — no per-card queries
   async function fetchPrayedIds() {
@@ -120,16 +231,55 @@ export default function WallScreen({ navigation }) {
         <ActivityIndicator style={{ flex: 1 }} color={colors.gold} />
       ) : (
         <FlatList
-          data={stones}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <StoneCard
-              stone={item}
-              initialPrayed={prayedIds.has(item.id)}
-              onPress={() => navigation.navigate('StoneDetail', { stone: item })}
-              onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
-            />
-          )}
+          data={groupedItems}
+          keyExtractor={item => item.key}
+          renderItem={({ item }) => {
+            if (item.type === 'yearHeader') {
+              return (
+                <TouchableOpacity
+                  style={styles.yearHeader}
+                  onPress={() => toggleGroup(item.groupKey)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.yearHeaderText}>
+                    {item.isExpanded ? '📂' : '📅'} {item.label}
+                  </Text>
+                  <Text style={styles.yearHeaderCount}>
+                    {item.count} {item.count === 1 ? 'item' : 'items'}
+                  </Text>
+                  <Text style={styles.yearHeaderArrow}>{item.isExpanded ? '⌄' : '›'}</Text>
+                </TouchableOpacity>
+              );
+            }
+            if (item.type === 'header') {
+              return (
+                <TouchableOpacity
+                  style={[styles.monthHeader, item.indent && styles.monthHeaderIndent, item.isCurrentMonth && styles.monthHeaderCurrent]}
+                  onPress={() => !item.isCurrentMonth && toggleGroup(item.groupKey)}
+                  activeOpacity={item.isCurrentMonth ? 1 : 0.7}
+                  disabled={item.isCurrentMonth}
+                >
+                  <Text style={[styles.monthHeaderText, item.isCurrentMonth && styles.monthHeaderTextCurrent]}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.monthHeaderCount}>
+                    {item.count} {item.count === 1 ? 'item' : 'items'}
+                  </Text>
+                  {!item.isCurrentMonth && (
+                    <Text style={styles.monthHeaderArrow}>{item.isExpanded ? '⌄' : '›'}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <StoneCard
+                stone={item.stone}
+                initialPrayed={prayedIds.has(item.stone.id)}
+                onPress={() => navigation.navigate('StoneDetail', { stone: item.stone })}
+                onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
+              />
+            );
+          }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />
           }
@@ -260,5 +410,73 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: spacing.xl,
     letterSpacing: 1,
+  },
+  yearHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gold + '15',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.gold + '40',
+  },
+  yearHeaderText: {
+    flex: 1,
+    fontFamily: fonts.uiBold,
+    fontSize: 16,
+    color: colors.inkDark,
+  },
+  yearHeaderCount: {
+    fontFamily: fonts.caption,
+    fontSize: 12,
+    color: colors.inkLight,
+    marginRight: 8,
+  },
+  yearHeaderArrow: {
+    fontFamily: fonts.uiBold,
+    fontSize: 18,
+    color: colors.gold,
+  },
+  monthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  monthHeaderIndent: {
+    marginLeft: spacing.lg,
+  },
+  monthHeaderCurrent: {
+    backgroundColor: colors.gold + '08',
+    borderColor: colors.gold + '30',
+  },
+  monthHeaderText: {
+    flex: 1,
+    fontFamily: fonts.uiBold,
+    fontSize: 14,
+    color: colors.inkDark,
+  },
+  monthHeaderTextCurrent: {
+    color: colors.gold,
+  },
+  monthHeaderCount: {
+    fontFamily: fonts.caption,
+    fontSize: 11,
+    color: colors.inkLight,
+    marginRight: 6,
+  },
+  monthHeaderArrow: {
+    fontFamily: fonts.uiBold,
+    fontSize: 16,
+    color: colors.inkLight,
   },
 });
