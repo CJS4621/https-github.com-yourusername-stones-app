@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, Modal, Alert, Image, ScrollView, TextInput,
-  KeyboardAvoidingView, Platform
+  KeyboardAvoidingView, Platform, Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto } from '../lib/api';
+import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto, getPendingRequests, approveJoinRequest, denyJoinRequest } from '../lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -31,17 +31,69 @@ export default function CircleDetailScreen({ route, navigation }) {
   const [showEdit, setShowEdit]           = useState(false);
   const [editName, setEditName]           = useState(initialCircle.name);
   const [editLogo, setEditLogo]           = useState(initialCircle.logo_url || null);
+  const [editIsPublic, setEditIsPublic]   = useState(initialCircle.is_public || false);
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const [saving, setSaving]               = useState(false);
   const [searchQuery, setSearchQuery]     = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [inviting, setInviting]           = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [processingRequest, setProcessingRequest] = useState(null);
 
   const isAdmin = role === 'admin';
 
   useEffect(() => {
     loadMembers();
+    if (isAdmin) loadPendingRequests();
   }, []);
+
+  async function loadPendingRequests() {
+    try {
+      const data = await getPendingRequests(currentCircle.id);
+      setPendingRequests(data || []);
+    } catch (err) {
+      console.log('Error loading pending requests:', err);
+    }
+  }
+
+  async function handleApprove(userId, displayName) {
+    setProcessingRequest(userId);
+    try {
+      await approveJoinRequest(currentCircle.id, userId);
+      Alert.alert('Approved! 🫂', `${displayName} has been added to ${currentCircle.name}.`);
+      loadMembers();
+      loadPendingRequests();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not approve request.');
+    } finally {
+      setProcessingRequest(null);
+    }
+  }
+
+  async function handleDeny(userId, displayName) {
+    Alert.alert(
+      'Deny Request',
+      `Deny ${displayName}'s request to join ${currentCircle.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deny',
+          style: 'destructive',
+          onPress: async () => {
+            setProcessingRequest(userId);
+            try {
+              await denyJoinRequest(currentCircle.id, userId);
+              loadPendingRequests();
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Could not deny request.');
+            } finally {
+              setProcessingRequest(null);
+            }
+          }
+        }
+      ]
+    );
+  }
 
   async function loadMembers() {
     setLoading(true);
@@ -82,8 +134,8 @@ export default function CircleDetailScreen({ route, navigation }) {
     if (!editName.trim()) { Alert.alert('Required', 'Please enter a circle name.'); return; }
     setSaving(true);
     try {
-      await editCircle(currentCircle.id, editName.trim(), editLogo);
-      setCurrentCircle(prev => ({ ...prev, name: editName.trim(), logo_url: editLogo }));
+      await editCircle(currentCircle.id, editName.trim(), editLogo, editIsPublic);
+      setCurrentCircle(prev => ({ ...prev, name: editName.trim(), logo_url: editLogo, is_public: editIsPublic }));
       setShowEdit(false);
       Alert.alert('Updated! 🫂', 'Circle details have been updated.');
     } catch (err) {
@@ -227,6 +279,25 @@ export default function CircleDetailScreen({ route, navigation }) {
                   autoFocus
                 />
 
+                <View style={s.privacyRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.privacyTitle}>
+                      {editIsPublic ? '🔓 Public Circle' : '🔒 Private Circle'}
+                    </Text>
+                    <Text style={s.privacyDesc}>
+                      {editIsPublic
+                        ? 'Anyone can discover and request to join.'
+                        : 'Only people you invite can join. Others see a lock icon.'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={editIsPublic}
+                    onValueChange={setEditIsPublic}
+                    trackColor={{ false: colors.border, true: colors.gold }}
+                    thumbColor="#FFF"
+                  />
+                </View>
+
                 <View style={{ height: spacing.lg }} />
 
                 <TouchableOpacity
@@ -354,6 +425,44 @@ export default function CircleDetailScreen({ route, navigation }) {
           <Text style={s.heroMeta}>{members.length} of 12 Members</Text>
         </View>
 
+        {/* Pending Requests (Admin Only) */}
+        {isAdmin && pendingRequests.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>📥 Pending Requests ({pendingRequests.length})</Text>
+            {pendingRequests.map(req => {
+              const reqUser = req.users;
+              return (
+                <View key={req.user_id} style={s.pendingRow}>
+                  {reqUser?.avatar_url
+                    ? <Image source={{ uri: reqUser.avatar_url }} style={s.memberAvatar} />
+                    : (
+                      <View style={s.memberAvatarPlaceholder}>
+                        <Text style={s.memberAvatarText}>{(reqUser?.display_name || '?')[0].toUpperCase()}</Text>
+                      </View>
+                    )
+                  }
+                  <View style={s.memberInfo}>
+                    <Text style={s.memberName}>{reqUser?.display_name || 'Unknown'}</Text>
+                    <Text style={s.memberRole}>Wants to join</Text>
+                  </View>
+                  {processingRequest === req.user_id ? (
+                    <ActivityIndicator color={colors.gold} />
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity style={s.approveBtn} onPress={() => handleApprove(req.user_id, reqUser?.display_name || 'User')}>
+                        <Text style={s.approveBtnText}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.denyBtn} onPress={() => handleDeny(req.user_id, reqUser?.display_name || 'User')}>
+                        <Text style={s.denyBtnText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Members */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Members</Text>
@@ -441,6 +550,61 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.gold,
     marginBottom: spacing.lg,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  privacyTitle: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    marginBottom: 2,
+  },
+  privacyDesc: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkLight,
+    lineHeight: 16,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  approveBtn: {
+    backgroundColor: '#2E8B57',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveBtnText: {
+    color: '#FFF',
+    fontFamily: fonts.uiBold,
+    fontSize: 18,
+  },
+  denyBtn: {
+    backgroundColor: '#E53E3E',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  denyBtnText: {
+    color: '#FFF',
+    fontFamily: fonts.uiBold,
+    fontSize: 18,
   },
   modalCancelBtnFull: {
     borderWidth: 1.5,

@@ -17,6 +17,7 @@ import StoneDetailScreen   from '../screens/StoneDetailScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import CirclesScreen       from '../screens/CirclesScreen';
 import CircleDetailScreen  from '../screens/CircleDetailScreen';
+import DiscoverCirclesScreen from '../screens/DiscoverCirclesScreen';
 import AnsweredWallScreen  from '../screens/AnsweredWallScreen';
 import AuthScreen          from '../screens/AuthScreen';
 import { useAuth }         from '../context/AuthContext';
@@ -186,6 +187,11 @@ export default function AppNavigator() {
             <RootStack.Screen
               name="CircleDetail"
               component={CircleDetailScreen}
+              options={{ presentation: 'card' }}
+            />
+            <RootStack.Screen
+              name="DiscoverCircles"
+              component={DiscoverCirclesScreen}
               options={{ presentation: 'card' }}
             />
             <RootStack.Screen

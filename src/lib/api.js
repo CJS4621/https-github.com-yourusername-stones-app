@@ -217,10 +217,10 @@ export async function getMyCircles(userId) {
   return apiFetch(`/circles?user_id=${userId}`);
 }
 
-export async function createCircle(ownerId, name, logoUrl = null) {
+export async function createCircle(ownerId, name, logoUrl = null, isPublic = false) {
   return apiFetch('/circles', {
     method: 'POST',
-    body: { owner_id: ownerId, name, logo_url: logoUrl },
+    body: { owner_id: ownerId, name, logo_url: logoUrl, is_public: isPublic },
   });
 }
 
@@ -285,10 +285,12 @@ export async function sendEncouragement(stoneId, userId) {
   });
 }
 
-export async function editCircle(circleId, name, logoUrl = null) {
+export async function editCircle(circleId, name, logoUrl = null, isPublic = undefined) {
+  const body = { name, logo_url: logoUrl };
+  if (isPublic !== undefined) body.is_public = isPublic;
   return apiFetch(`/circles/${circleId}`, {
     method: 'PATCH',
-    body: { name, logo_url: logoUrl },
+    body,
   });
 }
 
@@ -296,5 +298,36 @@ export async function createCustomDonation(amount) {
   return apiFetch('/stripe/checkout', {
     method: 'POST',
     body: { amount },
+  });
+}
+
+// ── Discover & Join Requests ────────────────────────────────
+
+export async function discoverCircles() {
+  return apiFetch('/circles/discover');
+}
+
+export async function requestToJoinCircle(circleId, userId) {
+  return apiFetch(`/circles/${circleId}/request`, {
+    method: 'POST',
+    body: { user_id: userId },
+  });
+}
+
+export async function getPendingRequests(circleId) {
+  return apiFetch(`/circles/${circleId}/pending`);
+}
+
+export async function approveJoinRequest(circleId, userId) {
+  return apiFetch(`/circles/${circleId}/approve`, {
+    method: 'POST',
+    body: { user_id: userId },
+  });
+}
+
+export async function denyJoinRequest(circleId, userId) {
+  return apiFetch(`/circles/${circleId}/deny`, {
+    method: 'POST',
+    body: { user_id: userId },
   });
 }

@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Modal, TextInput, Alert, Image
+  ActivityIndicator, Modal, TextInput, Alert, Image, Switch,
+  KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,6 +18,7 @@ export default function CirclesScreen({ navigation }) {
   const [showCreate, setShowCreate]   = useState(false);
   const [circleName, setCircleName]   = useState('');
   const [circleLogo, setCircleLogo]   = useState(null);
+  const [circleIsPublic, setCircleIsPublic] = useState(false);
   const [creating, setCreating]       = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -45,7 +47,7 @@ export default function CirclesScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.7,
       allowsEditing: true,
       aspect: [1, 1],
@@ -71,10 +73,11 @@ export default function CirclesScreen({ navigation }) {
     }
     setCreating(true);
     try {
-      await createCircle(user.id, circleName.trim(), circleLogo);
+      await createCircle(user.id, circleName.trim(), circleLogo, circleIsPublic);
       setShowCreate(false);
       setCircleName('');
       setCircleLogo(null);
+      setCircleIsPublic(false);
       loadCircles();
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not create circle.');
@@ -116,56 +119,84 @@ export default function CirclesScreen({ navigation }) {
 
       {/* Create Circle Modal */}
       <Modal visible={showCreate} animationType="slide" transparent onRequestClose={() => setShowCreate(false)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Create a Circle 🫂</Text>
-            <Text style={s.modalSubtitle}>A private space for your community</Text>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <Text style={s.modalTitle}>Create a Circle 🫂</Text>
+                <Text style={s.modalSubtitle}>A space for your community</Text>
 
-            <TouchableOpacity style={s.logoPickerBtn} onPress={handlePickLogo}>
-              {logoUploading
-                ? <ActivityIndicator color={colors.gold} />
-                : circleLogo
-                  ? <Image source={{ uri: circleLogo }} style={s.logoPreview} />
-                  : <Text style={s.logoPickerText}>📷 Add Circle Photo</Text>
-              }
-            </TouchableOpacity>
+                <TouchableOpacity style={s.logoPickerBtn} onPress={handlePickLogo}>
+                  {logoUploading
+                    ? <ActivityIndicator color={colors.gold} />
+                    : circleLogo
+                      ? <Image source={{ uri: circleLogo }} style={s.logoPreview} />
+                      : <Text style={s.logoPickerText}>📷 Add Circle Photo</Text>
+                  }
+                </TouchableOpacity>
 
-            <TextInput
-              style={s.modalInput}
-              placeholder="Circle name (e.g. Life Group, Family)"
-              placeholderTextColor={colors.inkLight}
-              value={circleName}
-              onChangeText={setCircleName}
-              autoCapitalize="words"
-              maxLength={50}
-            />
+                <TextInput
+                  style={s.modalInput}
+                  placeholder="Circle name (e.g. Life Group, Family)"
+                  placeholderTextColor={colors.inkLight}
+                  value={circleName}
+                  onChangeText={setCircleName}
+                  autoCapitalize="words"
+                  maxLength={50}
+                />
 
-            <TouchableOpacity
-              style={[s.modalBtn, creating && { opacity: 0.6 }]}
-              onPress={handleCreateCircle}
-              disabled={creating}
-            >
-              {creating
-                ? <ActivityIndicator color="#FFF" />
-                : <Text style={s.modalBtnText}>Create Circle</Text>
-              }
-            </TouchableOpacity>
+                <View style={s.privacyRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.privacyTitle}>
+                      {circleIsPublic ? '🔓 Public Circle' : '🔒 Private Circle'}
+                    </Text>
+                    <Text style={s.privacyDesc}>
+                      {circleIsPublic
+                        ? 'Anyone can discover and request to join.'
+                        : 'Only people you invite can join.'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={circleIsPublic}
+                    onValueChange={setCircleIsPublic}
+                    trackColor={{ false: colors.border, true: colors.gold }}
+                    thumbColor="#FFF"
+                  />
+                </View>
 
-            <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShowCreate(false)}>
-              <Text style={s.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.modalBtn, creating && { opacity: 0.6 }]}
+                  onPress={handleCreateCircle}
+                  disabled={creating}
+                >
+                  {creating
+                    ? <ActivityIndicator color="#FFF" />
+                    : <Text style={s.modalBtnText}>Create Circle</Text>
+                  }
+                </TouchableOpacity>
+
+                <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShowCreate(false)}>
+                  <Text style={s.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Header */}
       <View style={s.header}>
-        <View>
-          <Text style={s.title}>Circles</Text>
-          <Text style={s.subtitle}>Your private faith communities</Text>
+        <View style={s.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title}>Circles</Text>
+            <Text style={s.subtitle}>Your private faith communities</Text>
+          </View>
+          <TouchableOpacity style={s.createBtn} onPress={() => setShowCreate(true)}>
+            <Text style={s.createBtnText}>+ New</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={s.createBtn} onPress={() => setShowCreate(true)}>
-          <Text style={s.createBtnText}>+ New</Text>
+        <TouchableOpacity style={s.discoverBtn} onPress={() => navigation.navigate('DiscoverCircles')}>
+          <Text style={s.discoverBtnText}>🔍 Discover Circles</Text>
         </TouchableOpacity>
       </View>
 
@@ -199,14 +230,17 @@ export default function CirclesScreen({ navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   title: {
     fontFamily: type.displayFont,
@@ -230,6 +264,42 @@ const s = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: type.uiSize,
     color: '#FFF',
+  },
+  discoverBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    borderRadius: radius.full,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  discoverBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: colors.gold,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  privacyTitle: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    marginBottom: 2,
+  },
+  privacyDesc: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkLight,
+    lineHeight: 16,
   },
   circleCard: {
     flexDirection: 'row',
@@ -325,6 +395,8 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.xl,
     width: '100%',
+    marginTop: 60,
+    maxHeight: '85%',
     ...shadow.gold,
   },
   modalTitle: {
