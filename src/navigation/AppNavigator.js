@@ -22,6 +22,8 @@ import AnsweredWallScreen  from '../screens/AnsweredWallScreen';
 import AuthScreen          from '../screens/AuthScreen';
 import { useAuth }         from '../context/AuthContext';
 import SettingsScreen from '../screens/SettingsScreen';
+import BadgesScreen from '../screens/BadgesScreen';
+import { useHeartbeat } from '../lib/useHeartbeat';
 
 const Tab       = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -160,6 +162,7 @@ function MainTabs({ navigation }) {
 }
 
 export default function AppNavigator() {
+	useHeartbeat();   // 🔥 daily streak tracking
   const { user, loading } = useAuth();
   if (loading) return null;
 
@@ -169,6 +172,8 @@ export default function AppNavigator() {
         {user ? (
           <>
             <RootStack.Screen name="Main" component={MainTabs} />
+			<RootStack.Screen name="Badges" component={BadgesScreen} options={{ title: 'Badges' }} />
+			
             <RootStack.Screen
               name="DropStone"
               component={DropStoneScreen}

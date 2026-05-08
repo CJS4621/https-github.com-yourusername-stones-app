@@ -44,12 +44,17 @@ export const fonts = {
 };
 
 export const type = {
-  displaySize:   32,
-  displayFont:   'Lora_700Bold',
-  displayLine:   1.2,
+  // Big screen titles (Stones, Wall, Profile, Badges, etc.)
+  // Lora Regular at 26 — softer, more inviting than Bold; slightly smaller
+  displaySize:   26,
+  displayFont:   'Lora_400Regular',
+  displayLine:   1.3,
+
+  // Section / card titles inside screens (unchanged)
   titleSize:     20,
   titleFont:     'Lora_700Bold',
   titleLine:     1.3,
+
   bodySize:      16,
   bodyFont:      'Lora_400Regular',
   bodyLine:      1.7,

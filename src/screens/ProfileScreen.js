@@ -6,10 +6,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { getProfile, getFollowCounts, getJourney, sendInvite, uploadPhoto, updateProfile } from '../lib/api';
+import { getProfile, getFollowCounts, getJourney, sendInvite, uploadPhoto, updateProfile, getDailyStreak } from '../lib/api';
 import { signOut, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
+import { useNavigation } from '@react-navigation/native';
 
 async function getUserBadges(userId) {
   const { data, error } = await supabase
@@ -30,13 +31,19 @@ async function getInviteCount(userId) {
 }
 
 const ALL_BADGES = [
-  { key: 'first_stone',      emoji: '🪨', name: 'First Stone' },
-  { key: 'altar_of_fire',    emoji: '🔥', name: 'Altar of Fire' },
-  { key: 'intercessor',      emoji: '🙏', name: 'Intercessor' },
-  { key: 'ebenezer',         emoji: '✨', name: 'Ebenezer' },
-  { key: 'faithful_witness', emoji: '📅', name: 'Faithful Witness' },
-  { key: 'answered_prayer',  emoji: '🕊️', name: 'Answered Prayer' },
-  { key: 'community_pillar', emoji: '👥', name: 'Community Pillar' },
+  { key: 'first_stone',        emoji: '🪨',  name: 'First Stone' },
+  { key: 'altar_of_fire',      emoji: '🔥',  name: 'Altar of Fire' },
+  { key: 'intercessor',        emoji: '🙏',  name: 'Intercessor' },
+  { key: 'ebenezer',           emoji: '✨',  name: 'Ebenezer' },
+  { key: 'faithful_witness',   emoji: '📅',  name: 'Faithful Witness' },
+  { key: 'answered_prayer',    emoji: '🕊️', name: 'Answered Prayer' },
+  { key: 'community_pillar',   emoji: '👥',  name: 'Community Pillar' },
+  { key: 'barnabas',           emoji: '🤝',  name: 'Barnabas' },
+  { key: 'faithful_ebenezer',  emoji: '🌟',  name: 'Faithful Ebenezer' },
+  { key: 'faithful_barnabas',  emoji: '🌟',  name: 'Faithful Barnabas' },
+  { key: 'walking_daily',      emoji: '🚶',  name: 'Walking Daily' },
+  { key: 'steadfast',          emoji: '💪',  name: 'Steadfast' },
+  { key: 'pillar',             emoji: '🏛️', name: 'Pillar' },
 ];
 
 export default function ProfileScreen() {
@@ -46,6 +53,7 @@ export default function ProfileScreen() {
   const [stoneCount, setStoneCount]         = useState(0);
   const [badges, setBadges]                 = useState([]);
   const [inviteCount, setInviteCount]       = useState(0);
+  const [streak, setStreak]                 = useState({ current_daily_streak: 0, longest_daily_streak: 0 });
   const [loading, setLoading]               = useState(true);
   const [showInvite, setShowInvite]         = useState(false);
   const [showEdit, setShowEdit]             = useState(false);
@@ -56,6 +64,7 @@ export default function ProfileScreen() {
   const [editBio, setEditBio]               = useState('');
   const [editSaving, setEditSaving]         = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const navigation = useNavigation();
 
   useFocusEffect(
     useCallback(() => {
@@ -67,13 +76,15 @@ export default function ProfileScreen() {
         getJourney(user.id),
         getUserBadges(user.id),
         getInviteCount(user.id),
+        getDailyStreak(user.id),
       ])
-        .then(([p, c, stones, b, ic]) => {
+        .then(([p, c, stones, b, ic, st]) => {
           setProfile(p);
           setCounts(c);
           setStoneCount(stones.length);
           setBadges(b.map(b => b.badge_key));
           setInviteCount(ic);
+          setStreak(st);
         })
         .finally(() => setLoading(false));
     }, [user])
@@ -286,11 +297,16 @@ export default function ProfileScreen() {
           }
         </View>
 
-        {/* Stats */}
+        {/* Stats — 4 columns now: Stones · Streak · Followers · Following */}
         <View style={s.statsRow}>
           <View style={s.stat}>
             <Text style={s.statNum}>{stoneCount}</Text>
             <Text style={s.statLabel}>Stones</Text>
+          </View>
+          <View style={s.statDivider} />
+          <View style={s.stat}>
+            <Text style={s.statNum}>🔥 {streak.current_daily_streak}</Text>
+            <Text style={s.statLabel}>Day Streak</Text>
           </View>
           <View style={s.statDivider} />
           <View style={s.stat}>
@@ -304,15 +320,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Badges */}
-        <View style={s.badgesSection}>
+        {/* Badges — entire section is tappable to view full Badges screen */}
+        <TouchableOpacity
+          style={s.badgesSection}
+          onPress={() => navigation.navigate('Badges')}
+          activeOpacity={0.7}
+        >
           <View style={s.badgesHeader}>
             <Text style={s.badgesTitle}>Badges</Text>
             {altarsBuilt > 0 && (
               <Text style={s.altarBadge}>🏛️ {altarsBuilt} Altar{altarsBuilt > 1 ? 's' : ''} Built</Text>
             )}
           </View>
-          <Text style={s.badgesSubtitle}>{earnedCount} of {ALL_BADGES.length} earned</Text>
+          <Text style={s.badgesSubtitle}>
+            {earnedCount} of {ALL_BADGES.length} earned · Tap to view all →
+          </Text>
           <View style={s.badgesGrid}>
             {ALL_BADGES.map(badge => {
               const earned = badges.includes(badge.key);
@@ -328,7 +350,7 @@ export default function ProfileScreen() {
               );
             })}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Scripture */}
         <View style={s.scripture}>
@@ -449,7 +471,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: spacing.xl,
+    marginHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -458,7 +480,7 @@ const s = StyleSheet.create({
   stat: { alignItems: 'center', flex: 1 },
   statNum: {
     fontFamily: fonts.uiBold,
-    fontSize: 24,
+    fontSize: 20,
     color: colors.inkDark,
   },
   statLabel: {

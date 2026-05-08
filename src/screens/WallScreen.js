@@ -317,12 +317,14 @@ const styles = StyleSheet.create({
     fontSize: type.displaySize,
     color: colors.inkDark,
     lineHeight: type.displaySize * type.displayLine,
+    textAlign: 'center',
   },
   tagline: {
     fontFamily: fonts.body,
     fontSize: type.captionSize,
     color: colors.inkLight,
     marginTop: 2,
+    textAlign: 'center',
   },
   typeFilterRow: {
     flexDirection: 'row',

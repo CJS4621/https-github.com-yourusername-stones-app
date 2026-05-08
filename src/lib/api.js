@@ -1,4 +1,5 @@
 const NODE_RED_URL = process.env.NODE_RED_URL;
+
 import { supabase } from './supabase';
 
 // ── Authenticated fetch wrapper ─────────────────────────────
@@ -330,4 +331,30 @@ export async function denyJoinRequest(circleId, userId) {
     method: 'POST',
     body: { user_id: userId },
   });
+}
+
+export async function getBadges(userId) {
+  const res = await fetch(`${NODE_RED_URL}/badges/${userId}`);
+  if (!res.ok) throw new Error('Failed to fetch badges');
+  return res.json();
+}
+
+export async function recordHeartbeat(userId) {
+  const res = await fetch(`${NODE_RED_URL}/heartbeat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId })
+  });
+  if (!res.ok) throw new Error('Heartbeat failed');
+  return res.json();
+}
+
+export async function getDailyStreak(userId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('current_daily_streak, longest_daily_streak')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data || { current_daily_streak: 0, longest_daily_streak: 0 };
 }
