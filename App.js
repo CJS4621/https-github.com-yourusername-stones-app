@@ -1,13 +1,15 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Linking, Platform } from 'react-native';
 import { useFonts, Lora_400Regular, Lora_700Bold } from '@expo-google-fonts/lora';
 import { DMSans_400Regular, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { supabase } from './src/lib/supabase';
+import { setFocusStone } from './src/lib/wallFocus';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
@@ -43,7 +45,29 @@ async function registerForPushNotifications() {
   return token;
 }
 
+// Route a notification payload to the right place in the app
+function handleNotificationPayload(data, navigationRef) {
+  if (!data) return;
+  const { stone_id, screen } = data;
+
+  if (stone_id && (screen === 'Wall' || screen === 'StoneDetail')) {
+    // Signal the Wall to focus this stone
+    setFocusStone(stone_id);
+    // Jump to the Wall tab. Navigator is wrapped in a NavigationContainer
+    // ref so we can navigate from outside the component tree.
+    try {
+      // Try to navigate — tab name 'Main' wraps the tab navigator
+      navigationRef.current?.navigate?.('Main', { screen: 'Wall' });
+    } catch (e) {
+      // Fallback: just navigate to Wall directly
+      try { navigationRef.current?.navigate?.('Wall'); } catch (_) {}
+    }
+  }
+}
+
 export default function App() {
+  const navigationRef = useRef(null);
+
   const [fontsLoaded, fontError] = useFonts({
     Lora_400Regular,
     Lora_700Bold,
@@ -71,7 +95,6 @@ export default function App() {
         return;
       }
 
-      // Register push token when user signs in
       if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
         try {
           const token = await registerForPushNotifications();
@@ -88,6 +111,33 @@ export default function App() {
       }
     });
 
+    // ── Notification listeners ──────────────────────────────
+
+    // FOREGROUND: a push arrives while the app is open and visible
+    const fgSub = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request?.content?.data;
+      console.log('🔔 Foreground push received:', data);
+      // Auto-scroll silently (per design choice) — no banner, no interrupt
+      handleNotificationPayload(data, navigationRef);
+    });
+
+    // TAPPED: user tapped a notification (works whether app was bg or killed)
+    const tapSub = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification?.request?.content?.data;
+      console.log('🔔 Notification tapped:', data);
+      handleNotificationPayload(data, navigationRef);
+    });
+
+    // COLD-START: app was launched by tapping a notification
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        const data = response.notification?.request?.content?.data;
+        console.log('🔔 Cold-start notification:', data);
+        // Small delay so navigator is mounted before we navigate
+        setTimeout(() => handleNotificationPayload(data, navigationRef), 600);
+      }
+    });
+
     // Handle deep link when app is already open
     const subscription = Linking.addEventListener('url', ({ url }) => {
       if (url) supabase.auth.getSession();
@@ -101,6 +151,8 @@ export default function App() {
     return () => {
       subscription.remove();
       authListener?.subscription?.unsubscribe();
+      fgSub.remove();
+      tapSub.remove();
     };
   }, []);
 
@@ -124,7 +176,9 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusBar style="dark" />
-        <AppNavigator />
+        <NavigationContainer ref={navigationRef}>
+          <AppNavigator />
+        </NavigationContainer>
       </AuthProvider>
     </SafeAreaProvider>
   );

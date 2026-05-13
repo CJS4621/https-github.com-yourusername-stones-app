@@ -9,10 +9,16 @@ import StoneCard from '../components/StoneCard';
 import { getWall } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { consumeFocusStone, subscribeFocus } from '../lib/wallFocus';
 import { colors, fonts, type, spacing, radius } from '../theme';
 import { CATEGORY_LABELS } from '../theme';
 
-const CATEGORIES = ['all', ...Object.keys(CATEGORY_LABELS)];
+const TYPE_FILTERS = [
+  { key: 'all',             label: '✨ All' },
+  { key: 'stone',           label: '🪨 Stones' },
+  { key: 'prayer_request',  label: '🙏 Prayer' },
+];
+const CATEGORIES = Object.keys(CATEGORY_LABELS);
 
 export default function WallScreen({ navigation }) {
   const { user } = useAuth();
@@ -25,7 +31,9 @@ export default function WallScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore]       = useState(true);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
+  const [focusedStoneId, setFocusedStoneId] = useState(null);
   const fetchingRef                 = useRef(false);
+  const listRef                     = useRef(null);
 
   // Group stones by year-month with current month always expanded
   const groupedItems = React.useMemo(() => {
@@ -35,30 +43,24 @@ export default function WallScreen({ navigation }) {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
 
-    // Group stones by year-month
     const groups = {};
     stones.forEach(stone => {
       const date = new Date(stone.created_at);
       const year = date.getFullYear();
       const month = date.getMonth();
       const key = `${year}-${month}`;
-      if (!groups[key]) {
-        groups[key] = { year, month, stones: [], key };
-      }
+      if (!groups[key]) groups[key] = { year, month, stones: [], key };
       groups[key].stones.push(stone);
     });
 
-    // Sort groups: current month first, then descending
     const sortedGroups = Object.values(groups).sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year;
       return b.month - a.month;
     });
 
-    // Build flat list with headers and stones
     const items = [];
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-    // Track years that need year-level rollup
     const pastYears = {};
     sortedGroups.forEach(g => {
       if (g.year < currentYear) {
@@ -73,7 +75,6 @@ export default function WallScreen({ navigation }) {
       const isExpanded = isCurrentMonth || expandedGroups.has(g.key);
 
       if (isCurrentYear) {
-        // Show month headers individually for current year
         items.push({
           type: 'header',
           key: `header-${g.key}`,
@@ -89,7 +90,6 @@ export default function WallScreen({ navigation }) {
       }
     });
 
-    // Add past years as collapsed year groups
     Object.keys(pastYears).sort((a, b) => b - a).forEach(year => {
       const yearKey = `year-${year}`;
       const yearGroups = pastYears[year];
@@ -137,7 +137,6 @@ export default function WallScreen({ navigation }) {
     });
   }
 
-  // Batch fetch all prayed stone IDs once — no per-card queries
   async function fetchPrayedIds() {
     if (!user) return;
     const { data } = await supabase
@@ -162,13 +161,47 @@ export default function WallScreen({ navigation }) {
     }
   }, [category, typeFilter]);
 
-  // Refresh wall and prayed IDs every time screen comes into focus
+  // Scroll to a specific stone + trigger glow (from notification deep-link)
+  const focusOnStone = useCallback((stoneId) => {
+    if (!stoneId || !listRef.current) return;
+    setCategory('all');
+    setTypeFilter('all');
+    setTimeout(() => {
+      const idx = groupedItems.findIndex(it => it.type === 'stone' && it.stone.id === stoneId);
+      if (idx >= 0) {
+        try {
+          listRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
+        } catch (e) {
+          setTimeout(() => {
+            try { listRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 }); }
+            catch (_) {}
+          }, 350);
+        }
+      }
+      setFocusedStoneId(stoneId);
+      setTimeout(() => setFocusedStoneId(null), 6000);
+    }, 250);
+  }, [groupedItems]);
+
+  useEffect(() => {
+    const pending = consumeFocusStone();
+    if (pending) focusOnStone(pending);
+    const unsubscribe = subscribeFocus(id => {
+      consumeFocusStone();
+      focusOnStone(id);
+    });
+    return unsubscribe;
+  }, [focusOnStone]);
+
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       setStones([]);
       fetchPrayedIds();
       fetchStones(1, category, true, typeFilter);
+
+      const pending = consumeFocusStone();
+      if (pending) setTimeout(() => focusOnStone(pending), 600);
     }, [category, typeFilter])
   );
 
@@ -188,51 +221,66 @@ export default function WallScreen({ navigation }) {
         <Text style={styles.logo}>Stones</Text>
         <Text style={styles.tagline}>"Thus far the Lord has helped us" — 1 Sam 7:12</Text>
       </View>
-      {/* Type Filter */}
-      <View style={styles.typeFilterRow}>
-        {[
-          { key: 'all', label: '✨ All' },
-          { key: 'stone', label: '🪨 Stones' },
-          { key: 'prayer_request', label: '🙏 Prayer Requests' },
-        ].map(({ key, label }) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.typeChip, typeFilter === key && styles.typeChipActive]}
-            onPress={() => setTypeFilter(key)}
-          >
-            <Text style={[styles.typeChipText, typeFilter === key && styles.typeChipTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
 
-      {/* Category chips */}
-      <View style={styles.chipsWrapper}>
+      {/* Merged single-row filter strip — type filters + divider + categories */}
+      <View style={styles.chipStripWrap}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
+          contentContainerStyle={styles.chipStrip}
         >
+          {/* Type filters */}
+          {TYPE_FILTERS.map(({ key, label }) => (
+            <TouchableOpacity
+              key={`type-${key}`}
+              style={[styles.chip, typeFilter === key && styles.chipActive]}
+              onPress={() => setTypeFilter(key)}
+            >
+              <Text style={[styles.chipText, typeFilter === key && styles.chipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Visual divider between type filters and category filters */}
+          <View style={styles.chipDivider} />
+
+          {/* Category filters */}
+          <TouchableOpacity
+            key="cat-all"
+            style={[styles.chip, category === 'all' && styles.chipActive]}
+            onPress={() => setCategory('all')}
+          >
+            <Text style={[styles.chipText, category === 'all' && styles.chipTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
           {CATEGORIES.map(cat => (
             <TouchableOpacity
-              key={cat}
+              key={`cat-${cat}`}
               style={[styles.chip, category === cat && styles.chipActive]}
               onPress={() => setCategory(cat)}
             >
               <Text style={[styles.chipText, category === cat && styles.chipTextActive]}>
-                {cat === 'all' ? 'All' : CATEGORY_LABELS[cat]}
+                {CATEGORY_LABELS[cat]}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
+
       {loading ? (
         <ActivityIndicator style={{ flex: 1 }} color={colors.gold} />
       ) : (
         <FlatList
+          ref={listRef}
           data={groupedItems}
           keyExtractor={item => item.key}
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+            }, 100);
+          }}
           renderItem={({ item }) => {
             if (item.type === 'yearHeader') {
               return (
@@ -275,6 +323,7 @@ export default function WallScreen({ navigation }) {
               <StoneCard
                 stone={item.stone}
                 initialPrayed={prayedIds.has(item.stone.id)}
+                glowing={focusedStoneId === item.stone.id}
                 onPress={() => navigation.navigate('StoneDetail', { stone: item.stone })}
                 onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
               />
@@ -326,56 +375,27 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  typeFilterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+
+  // Merged single-row filter strip
+  chipStripWrap: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.bg,
   },
-  typeChip: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeChipActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
-  },
-  typeChipText: {
-    fontFamily: fonts.uiBold,
-    fontSize: 12,
-    color: colors.inkMid,
-    textAlign: 'center',
-    width: '100%',
-  },
-  typeChipTextActive: { color: '#FFF' },
-  chipsWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  chips: {
+  chipStrip: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
     borderRadius: radius.full,
     backgroundColor: colors.bgCard,
     borderWidth: 1.5,
     borderColor: colors.border,
-    marginRight: spacing.sm,
+    marginRight: spacing.xs + 2,
   },
   chipActive: {
     backgroundColor: colors.gold,
@@ -383,10 +403,19 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontFamily: fonts.uiBold,
-    fontSize: type.captionSize,
+    fontSize: 11,
     color: colors.inkMid,
   },
   chipTextActive: { color: '#FFF' },
+
+  // Subtle vertical divider between type filters and category filters
+  chipDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.sm,
+  },
+
   emptyContainer: {
     alignItems: 'center',
     paddingTop: spacing.xxxl,
@@ -454,9 +483,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  monthHeaderIndent: {
-    marginLeft: spacing.lg,
-  },
+  monthHeaderIndent: { marginLeft: spacing.lg },
   monthHeaderCurrent: {
     backgroundColor: colors.gold + '08',
     borderColor: colors.gold + '30',
@@ -467,9 +494,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.inkDark,
   },
-  monthHeaderTextCurrent: {
-    color: colors.gold,
-  },
+  monthHeaderTextCurrent: { color: colors.gold },
   monthHeaderCount: {
     fontFamily: fonts.caption,
     fontSize: 11,

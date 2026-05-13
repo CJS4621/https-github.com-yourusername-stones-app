@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   TouchableOpacity, Text, View, StyleSheet, Modal, Pressable, Linking
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors, fonts } from '../theme';
@@ -162,74 +161,72 @@ function MainTabs({ navigation }) {
 }
 
 export default function AppNavigator() {
-	useHeartbeat();   // 🔥 daily streak tracking
+  useHeartbeat();   // 🔥 daily streak tracking
   const { user, loading } = useAuth();
   if (loading) return null;
 
   return (
-    <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <>
-            <RootStack.Screen name="Main" component={MainTabs} />
-			<RootStack.Screen name="Badges" component={BadgesScreen} options={{ title: 'Badges' }} />
-			
-            <RootStack.Screen
-              name="DropStone"
-              component={DropStoneScreen}
-              options={{ presentation: 'modal' }}
-            />
-            <RootStack.Screen
-              name="StoneDetail"
-              component={StoneDetailScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="PublicProfile"
-              component={PublicProfileScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="CircleDetail"
-              component={CircleDetailScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="DiscoverCircles"
-              component={DiscoverCirclesScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="Journey"
-              component={JourneyScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="PrayerQueue"
-              component={PrayerQueueScreen}
-              options={{ presentation: 'card' }}
-            />
-            <RootStack.Screen
-              name="AnsweredWall"
-              component={AnsweredWallScreen}
-              options={{ presentation: 'card' }}
-            />
-			<RootStack.Screen
-			  name="HowTo"
-			  component={HowToScreen}
-			  options={{ presentation: 'card' }}
-			/>
-			<RootStack.Screen
-			  name="Settings"
-			  component={SettingsScreen}
-			  options={{ presentation: 'card' }}
-			/>
-          </>
-        ) : (
-          <RootStack.Screen name="Auth" component={AuthScreen} />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      {user ? (
+        <>
+          <RootStack.Screen name="Main" component={MainTabs} />
+          <RootStack.Screen name="Badges" component={BadgesScreen} options={{ title: 'Badges' }} />
+
+          <RootStack.Screen
+            name="DropStone"
+            component={DropStoneScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <RootStack.Screen
+            name="StoneDetail"
+            component={StoneDetailScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="PublicProfile"
+            component={PublicProfileScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="CircleDetail"
+            component={CircleDetailScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="DiscoverCircles"
+            component={DiscoverCirclesScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="Journey"
+            component={JourneyScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="PrayerQueue"
+            component={PrayerQueueScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="AnsweredWall"
+            component={AnsweredWallScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="HowTo"
+            component={HowToScreen}
+            options={{ presentation: 'card' }}
+          />
+          <RootStack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ presentation: 'card' }}
+          />
+        </>
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthScreen} />
+      )}
+    </RootStack.Navigator>
   );
 }
 
