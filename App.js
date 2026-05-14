@@ -48,8 +48,9 @@ async function registerForPushNotifications() {
 // Route a notification payload to the right place in the app
 function handleNotificationPayload(data, navigationRef) {
   if (!data) return;
-  const { stone_id, screen } = data;
+  const { stone_id, circle_id, screen } = data;
 
+  // Encouragement → focus a stone on the Wall
   if (stone_id && (screen === 'Wall' || screen === 'StoneDetail')) {
     // Signal the Wall to focus this stone
     setFocusStone(stone_id);
@@ -62,6 +63,29 @@ function handleNotificationPayload(data, navigationRef) {
       // Fallback: just navigate to Wall directly
       try { navigationRef.current?.navigate?.('Wall'); } catch (_) {}
     }
+    return;
+  }
+
+  // Circle request / approval / denial → open that specific circle.
+  // The notification only carries circle_id, so we pass a "stub" circle
+  // object marked with _isStub. CircleDetailScreen detects the stub and
+  // hydrates the full circle record before rendering.
+  if (circle_id && screen === 'CircleDetail') {
+    try {
+      navigationRef.current?.navigate?.('CircleDetail', {
+        circle: { id: circle_id, _isStub: true },
+        // Request notifications are sent to the circle admin. Approve/deny
+        // notifications go to a member. CircleDetailScreen re-derives the
+        // true admin status after hydration, so this is just an initial hint.
+        role: data.role || 'member',
+      });
+    } catch (e) {
+      // Fallback: open the Circles tab so the user can find it manually
+      try {
+        navigationRef.current?.navigate?.('Main', { screen: 'Circles' });
+      } catch (_) {}
+    }
+    return;
   }
 }
 

@@ -22,14 +22,20 @@ async function searchUsers(query) {
 }
 
 export default function CircleDetailScreen({ route, navigation }) {
-  const { circle: initialCircle, role } = route.params;
+  const { circle: initialCircle, role: initialRole } = route.params;
   const { user } = useAuth();
+
+  // When opened from a push notification, only { id, _isStub: true } is passed.
+  // In that case we hydrate the full circle record before rendering.
+  const isStub = !!initialCircle?._isStub;
+
   const [currentCircle, setCurrentCircle] = useState(initialCircle);
+  const [hydrating, setHydrating]         = useState(isStub);
   const [members, setMembers]             = useState([]);
   const [loading, setLoading]             = useState(true);
   const [showInvite, setShowInvite]       = useState(false);
   const [showEdit, setShowEdit]           = useState(false);
-  const [editName, setEditName]           = useState(initialCircle.name);
+  const [editName, setEditName]           = useState(initialCircle.name || '');
   const [editLogo, setEditLogo]           = useState(initialCircle.logo_url || null);
   const [editIsPublic, setEditIsPublic]   = useState(initialCircle.is_public || false);
   const [editLogoUploading, setEditLogoUploading] = useState(false);
@@ -40,12 +46,52 @@ export default function CircleDetailScreen({ route, navigation }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [processingRequest, setProcessingRequest] = useState(null);
 
-  const isAdmin = role === 'admin';
+  // isAdmin is stateful: from a notification the role hint may be wrong, so
+  // after hydration we re-derive it from the circle's owner_id.
+  const [isAdmin, setIsAdmin] = useState(initialRole === 'admin');
 
+  // Hydrate a stub circle (opened via push notification) into a full record.
   useEffect(() => {
+    if (!isStub) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('circles')
+          .select('*')
+          .eq('id', initialCircle.id)
+          .single();
+        if (error) throw error;
+        if (cancelled) return;
+        if (data) {
+          setCurrentCircle(data);
+          setEditName(data.name || '');
+          setEditLogo(data.logo_url || null);
+          setEditIsPublic(data.is_public || false);
+          // Re-derive admin status from the real owner_id
+          setIsAdmin(data.owner_id === user?.id);
+        }
+      } catch (err) {
+        console.log('Error hydrating circle from notification:', err);
+        Alert.alert(
+          'Circle Unavailable',
+          'This circle could not be opened. It may have been deleted.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isStub]);
+
+  // Load members + pending requests. For a stub, wait until hydration finishes
+  // (and isAdmin has been re-derived) before loading.
+  useEffect(() => {
+    if (hydrating) return;
     loadMembers();
     if (isAdmin) loadPendingRequests();
-  }, []);
+  }, [hydrating, isAdmin]);
 
   async function loadPendingRequests() {
     try {
@@ -237,6 +283,33 @@ export default function CircleDetailScreen({ route, navigation }) {
           </Text>
         </View>
       </View>
+    );
+  }
+
+  // While hydrating a stub circle (opened from a push notification),
+  // show a loading state so we never render with incomplete data.
+  if (hydrating) {
+    return (
+      <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={s.back}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Circle</Text>
+          <View style={{ width: 60 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.gold} size="large" />
+          <Text style={{
+            fontFamily: fonts.body,
+            fontSize: type.bodySize,
+            color: colors.inkLight,
+            marginTop: spacing.md,
+          }}>
+            Opening circle…
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 

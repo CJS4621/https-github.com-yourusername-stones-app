@@ -408,12 +408,14 @@ const styles = StyleSheet.create({
   },
   chipTextActive: { color: '#FFF' },
 
-  // Subtle vertical divider between type filters and category filters
+  // Vertical divider between type filters and category filters
   chipDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.sm,
+    width: 3,
+    height: 26,
+    borderRadius: 2,
+    backgroundColor: colors.inkLight,
+    marginHorizontal: spacing.md,
+    alignSelf: 'center',
   },
 
   emptyContainer: {
