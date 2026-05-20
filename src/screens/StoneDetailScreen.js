@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Modal, TextInput, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform, FlatList, Linking, Image
+  KeyboardAvoidingView, Platform, FlatList, Linking, Image, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -116,7 +116,7 @@ export default function StoneDetailScreen({ route, navigation }) {
   const [editPhotoUri, setEditPhotoUri]           = useState(null);
   const [uploadingPhoto, setUploadingPhoto]       = useState(false);
   const [encouraged, setEncouraged]               = useState(false);
-  const [encouraging, setEncouraging]             = useState(false);
+  const encourageScale                             = useRef(new Animated.Value(1)).current;
   const [saving, setSaving]                       = useState(false);
 
   const isOwner  = user?.id === stone.user_id;
@@ -195,17 +195,26 @@ export default function StoneDetailScreen({ route, navigation }) {
   }
 
   async function handleEncourage() {
-    if (!user) return;
-    setEncouraging(true);
+    if (!user || encouraged) return;
+
+    // ── Optimistic update — flip state IMMEDIATELY so the UI feels instant.
+    setEncouraged(true);
+
+    // Haptic the moment they tap (not after the await)
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+    // Visible scale pulse for feedback — matches the Pray button's pop
+    Animated.sequence([
+      Animated.timing(encourageScale, { toValue: 1.35, duration: 140, useNativeDriver: true }),
+      Animated.timing(encourageScale, { toValue: 1,    duration: 180, useNativeDriver: true }),
+    ]).start();
+
+    // Backend call in the background — revert if it fails
     try {
       await sendEncouragement(currentStone.id, user.id);
-      setEncouraged(true);
-      // Swoosh feeling — success notification haptic instead of alert
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
+      setEncouraged(false);
       Alert.alert('Error', err.message || 'Could not send encouragement.');
-    } finally {
-      setEncouraging(false);
     }
   }
 
@@ -542,20 +551,24 @@ export default function StoneDetailScreen({ route, navigation }) {
           <Text style={s.authorName}>— {currentStone.display_name}</Text>
         </View>
 
-        {/* Encourage button — only for non-owners */}
+        {/* Encourage button — only for non-owners.
+            Optimistic UI: instant state flip + haptic + scale pulse on tap,
+            backend call runs in background, reverts on failure. */}
         {!isOwner && (
           <TouchableOpacity
             style={[s.encourageBtn, encouraged && s.encourageBtnDone]}
             onPress={handleEncourage}
-            disabled={encouraged || encouraging}
+            disabled={encouraged}
             activeOpacity={0.7}
           >
-            {encouraging
-              ? <ActivityIndicator color={colors.gold} />
-              : <Text style={encouraged ? s.encourageBtnTextDone : s.encourageBtnText}>
-                  {encouraged ? '✅ Encouraged' : '💌 Encourage'}
-                </Text>
-            }
+            <Animated.Text
+              style={[
+                encouraged ? s.encourageBtnTextDone : s.encourageBtnText,
+                { transform: [{ scale: encourageScale }] },
+              ]}
+            >
+              {encouraged ? '✅ Encouraged' : '💌 Encourage'}
+            </Animated.Text>
           </TouchableOpacity>
         )}
 

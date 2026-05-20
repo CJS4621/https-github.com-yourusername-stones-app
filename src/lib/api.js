@@ -358,3 +358,14 @@ export async function getDailyStreak(userId) {
   if (error) throw error;
   return data || { current_daily_streak: 0, longest_daily_streak: 0 };
 }
+
+/**
+ * Permanently delete the user's account and all their data.
+ * Cascades through stones, prayers, encouragements, circles, follows, etc.
+ * After successful deletion, the caller should sign out (session is dead anyway).
+ *
+ * @param {string} userId
+ */
+export async function deleteAccount(userId) {
+  return apiFetch(`/users/${userId}`, { method: 'DELETE' });
+}

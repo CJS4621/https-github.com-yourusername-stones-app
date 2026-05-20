@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { createCustomDonation } from '../lib/api';
+import { createCustomDonation, deleteAccount } from '../lib/api';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 
 const DONATION_LINKS = {
@@ -102,6 +102,60 @@ export default function SettingsScreen({ navigation }) {
         }
       ]
     );
+  }
+
+  async function handleDeleteAccount() {
+    // ── First Alert: gentle warning + scope
+    Alert.alert(
+      '🗑️ Delete Account?',
+      'This will permanently delete your account and ALL your data:\n\n' +
+      '• All your stones and testimonies\n' +
+      '• All your prayer requests\n' +
+      '• Prayer commitments and encouragements you\'ve sent\n' +
+      '• Circles you own (and their members)\n' +
+      '• Your followers, follows, and badges\n\n' +
+      'This cannot be undone. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => {
+            // ── Second Alert: final confirmation
+            Alert.alert(
+              '⚠️ Final Confirmation',
+              'This is permanent. Your account and all data will be deleted immediately.\n\nProceed?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Forever',
+                  style: 'destructive',
+                  onPress: performDelete
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  }
+
+  async function performDelete() {
+    if (!user?.id) {
+      Alert.alert('Error', 'No user session. Please sign in again.');
+      return;
+    }
+    try {
+      await deleteAccount(user.id);
+      // Sign out — though the backend deleted the auth user, this clears local session state cleanly.
+      // The auth listener in App.js will route back to the Auth screen.
+      await supabase.auth.signOut();
+    } catch (err) {
+      Alert.alert(
+        'Deletion Failed',
+        err.message || 'Could not delete your account. Please try again or contact support.'
+      );
+    }
   }
 
   function handleDonate(amount) {
@@ -231,13 +285,18 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Linking.openURL('https://stonesapp.ca/privacy-policy.html')}
           />
           <SettingRow
+            icon="📜"
+            label="Terms of Service"
+            onPress={() => Linking.openURL('https://stonesapp.ca/terms.html')}
+          />
+          <SettingRow
             icon="📋"
             label="How To Use"
             onPress={() => navigation.navigate('HowTo')}
           />
           <SettingRow
             icon="ℹ️"
-            label="Version 1.0.1"
+            label="Version 1.0.29"
             chevron={false}
             onPress={() => {}}
           />
@@ -250,6 +309,12 @@ export default function SettingsScreen({ navigation }) {
             icon="🚪"
             label="Sign Out"
             onPress={handleSignOut}
+            isDestructive
+          />
+          <SettingRow
+            icon="🗑️"
+            label="Delete Account"
+            onPress={handleDeleteAccount}
             isDestructive
           />
         </View>
