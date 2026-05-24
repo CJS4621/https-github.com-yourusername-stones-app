@@ -4,7 +4,7 @@ module.exports = {
   expo: {
     name: IS_DEV ? 'Stones (Dev)' : 'Stones',
     slug: 'stones-fresh',
-    version: '1.0.2',
+    version: '1.0.30',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -18,6 +18,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: IS_DEV ? 'ca.stonesapp.stones.dev' : 'ca.stonesapp.stones',
+      buildNumber: '30',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
