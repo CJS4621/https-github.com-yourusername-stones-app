@@ -5,7 +5,8 @@ import {
   KeyboardAvoidingView, Platform, Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto, getPendingRequests, approveJoinRequest, denyJoinRequest } from '../lib/api';
+import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto, getPendingRequests, approveJoinRequest, denyJoinRequest, getCircleStones, sendPrayerPrompt } from '../lib/api';
+import StoneCard from '../components/StoneCard';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -46,6 +47,17 @@ export default function CircleDetailScreen({ route, navigation }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [processingRequest, setProcessingRequest] = useState(null);
 
+  // V30 Phase C — Circle Wall (posts in this circle)
+  const [circleStones, setCircleStones] = useState([]);
+  const [loadingStones, setLoadingStones] = useState(true);
+
+  // V30 Phase D — Prayer Prompt (admin-only)
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [promptText, setPromptText] = useState('');
+  const [sendingPrompt, setSendingPrompt] = useState(false);
+  const [lastPromptSentAt, setLastPromptSentAt] = useState(null);
+  const [cooldownText, setCooldownText] = useState('');
+
   // isAdmin is stateful: from a notification the role hint may be wrong, so
   // after hydration we re-derive it from the circle's owner_id.
   const [isAdmin, setIsAdmin] = useState(initialRole === 'admin');
@@ -85,11 +97,12 @@ export default function CircleDetailScreen({ route, navigation }) {
     return () => { cancelled = true; };
   }, [isStub]);
 
-  // Load members + pending requests. For a stub, wait until hydration finishes
+  // Load members + pending requests + circle wall. For a stub, wait until hydration finishes
   // (and isAdmin has been re-derived) before loading.
   useEffect(() => {
     if (hydrating) return;
     loadMembers();
+    loadCircleStones();
     if (isAdmin) loadPendingRequests();
   }, [hydrating, isAdmin]);
 
@@ -150,6 +163,99 @@ export default function CircleDetailScreen({ route, navigation }) {
       console.log('Error loading members:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // V30 Phase C — Load all stones in this circle (members-only, RLS enforced)
+  async function loadCircleStones() {
+    setLoadingStones(true);
+    try {
+      const result = await getCircleStones(currentCircle.id, user.id);
+      const list = Array.isArray(result?.stones) ? result.stones : (Array.isArray(result) ? result : []);
+      setCircleStones(list);
+    } catch (err) {
+      console.log('Error loading circle stones:', err);
+      setCircleStones([]);
+    } finally {
+      setLoadingStones(false);
+    }
+  }
+
+  // V30 Phase D — Read last_prompt_sent_at from the hydrated circle (or refetch fresh)
+  useEffect(() => {
+    if (hydrating || !isAdmin) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('circles')
+          .select('last_prompt_sent_at')
+          .eq('id', currentCircle.id)
+          .single();
+        if (mounted) setLastPromptSentAt(data?.last_prompt_sent_at || null);
+      } catch (err) {
+        console.log('Error loading prompt cooldown:', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [hydrating, isAdmin, currentCircle?.id]);
+
+  // V30 Phase D — Tick every minute to update cooldown countdown text
+  useEffect(() => {
+    if (!lastPromptSentAt) {
+      setCooldownText('');
+      return;
+    }
+    const tick = () => {
+      const now = new Date();
+      const lastSent = new Date(lastPromptSentAt);
+      const cooldownMs = 24 * 60 * 60 * 1000;
+      const remainingMs = cooldownMs - (now - lastSent);
+      if (remainingMs <= 0) {
+        setCooldownText('');
+        return;
+      }
+      const hours = Math.floor(remainingMs / (60 * 60 * 1000));
+      const minutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+      if (hours > 0) {
+        setCooldownText(`Available again in ${hours}h ${minutes}m`);
+      } else {
+        setCooldownText(`Available again in ${minutes}m`);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 60000);
+    return () => clearInterval(interval);
+  }, [lastPromptSentAt]);
+
+  // V30 Phase D — Send the prayer prompt
+  async function handleSendPrompt() {
+    const trimmed = promptText.trim();
+    if (!trimmed) {
+      Alert.alert('Required', 'Please enter a message for your circle.');
+      return;
+    }
+    if (trimmed.length > 280) {
+      Alert.alert('Too long', 'Prayer prompt must be 280 characters or fewer.');
+      return;
+    }
+    setSendingPrompt(true);
+    try {
+      const result = await sendPrayerPrompt(currentCircle.id, user.id, trimmed);
+      setLastPromptSentAt(result.last_prompt_sent_at);
+      setShowPromptModal(false);
+      setPromptText('');
+      const sentTo = result.recipients || 0;
+      Alert.alert(
+        '🙏 Prayer Prompt Sent',
+        sentTo > 0
+          ? `Sent to ${sentTo} member${sentTo === 1 ? '' : 's'}.`
+          : 'No members with notifications enabled to receive this prompt.'
+      );
+    } catch (err) {
+      Alert.alert('Could not send', err.message || 'Failed to send prayer prompt.');
+    } finally {
+      setSendingPrompt(false);
     }
   }
 
@@ -397,6 +503,64 @@ export default function CircleDetailScreen({ route, navigation }) {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* V30 Phase D — Prayer Prompt Modal */}
+      <Modal
+        visible={showPromptModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowPromptModal(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <Text style={s.modalTitle}>🙏 Send Prayer Prompt</Text>
+              <Text style={s.modalSubtitle}>
+                Invite your circle to share what's on their heart.
+              </Text>
+
+              <TextInput
+                style={s.promptInput}
+                placeholder="What would you like to ask your circle?"
+                placeholderTextColor={colors.inkLight}
+                value={promptText}
+                onChangeText={setPromptText}
+                multiline
+                numberOfLines={4}
+                maxLength={280}
+                textAlignVertical="top"
+                autoFocus
+              />
+
+              <Text style={s.promptCharCount}>
+                {promptText.length} / 280
+              </Text>
+
+              <Text style={s.promptModalHint}>
+                All {members.length - 1} other member{members.length - 1 === 1 ? '' : 's'} will receive a push notification.
+              </Text>
+
+              <TouchableOpacity
+                style={[s.modalBtn, (sendingPrompt || !promptText.trim()) && { opacity: 0.5 }]}
+                onPress={handleSendPrompt}
+                disabled={sendingPrompt || !promptText.trim()}
+              >
+                {sendingPrompt
+                  ? <ActivityIndicator color="#FFF" />
+                  : <Text style={s.modalBtnText}>Send Prompt</Text>
+                }
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.modalCancelBtn}
+                onPress={() => { setShowPromptModal(false); setPromptText(''); }}
+              >
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Invite Modal */}
       <Modal visible={showInvite} animationType="slide" transparent onRequestClose={() => setShowInvite(false)}>
         <View style={s.modalOverlay}>
@@ -479,7 +643,8 @@ export default function CircleDetailScreen({ route, navigation }) {
             )}
           </View>
         </View>
-        <Text style={s.headerTitle}>{currentCircle.name}</Text>
+        <Text style={s.headerVerse}>"Thus far the Lord has helped us"</Text>
+        <Text style={s.headerVerseRef}>— 1 Samuel 7:12 (ESV)</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
@@ -533,6 +698,62 @@ export default function CircleDetailScreen({ route, navigation }) {
                 </View>
               );
             })}
+          </View>
+        )}
+
+        {/* V30 Phase C — Circle Wall (members-only stones + prayer requests) */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>🪨 Circle Wall</Text>
+
+          {loadingStones ? (
+            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.md }} />
+          ) : circleStones.length === 0 ? (
+            <View style={s.emptyWall}>
+              <Text style={s.emptyWallTitle}>No stones here yet.</Text>
+              <Text style={s.emptyWallText}>Be the first to share what God is doing in this circle.</Text>
+              <TouchableOpacity
+                style={s.emptyWallBtn}
+                onPress={() => navigation.navigate('DropStone', { presetCircleId: currentCircle.id })}
+                activeOpacity={0.85}
+              >
+                <Text style={s.emptyWallBtnText}>+ Drop the first one</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            circleStones.map(stone => (
+              <View key={stone.id} style={{ marginBottom: spacing.sm }}>
+                <StoneCard
+                  stone={stone}
+                  onPress={() => navigation.navigate('StoneDetail', { stone })}
+                  onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
+                />
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* V30 Phase D — Send Prayer Prompt (admin-only) */}
+        {isAdmin && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>🙏 Prayer Prompt</Text>
+            <Text style={s.promptIntro}>
+              Invite your circle to share what's on their heart.
+            </Text>
+            <TouchableOpacity
+              style={[s.promptBtn, cooldownText && s.promptBtnDisabled]}
+              onPress={() => setShowPromptModal(true)}
+              disabled={!!cooldownText}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.promptBtnText, cooldownText && s.promptBtnTextDisabled]}>
+                {cooldownText ? '⏰ Sent recently' : '+ Send Prayer Prompt'}
+              </Text>
+            </TouchableOpacity>
+            {cooldownText ? (
+              <Text style={s.promptCooldown}>{cooldownText}</Text>
+            ) : (
+              <Text style={s.promptHint}>Once per day per circle</Text>
+            )}
           </View>
         )}
 
@@ -592,6 +813,23 @@ const s = StyleSheet.create({
     fontFamily: type.displayFont,
     fontSize: 22,
     color: colors.inkDark,
+  },
+  headerVerse: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 15,
+    color: colors.inkLight,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  headerVerseRef: {
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    color: colors.gold,
+    textAlign: 'center',
+    marginTop: 2,
+    letterSpacing: 0.5,
   },
   addMemberBtn: {
     backgroundColor: colors.gold,
@@ -765,11 +1003,13 @@ const s = StyleSheet.create({
     fontSize: 26,
     color: colors.inkDark,
     marginBottom: 4,
+    textAlign: 'center',
   },
   heroMeta: {
     fontFamily: fonts.caption,
     fontSize: type.captionSize,
     color: colors.inkLight,
+    textAlign: 'center',
   },
   section: {
     marginHorizontal: spacing.lg,
@@ -780,6 +1020,116 @@ const s = StyleSheet.create({
     fontSize: type.uiSize,
     color: colors.inkDark,
     marginBottom: spacing.md,
+  },
+  // V30 Phase C — empty Circle Wall state
+  emptyWall: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.bgCard || 'rgba(255,255,255,0.5)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  emptyWallTitle: {
+    fontFamily: fonts.uiBold,
+    fontSize: 15,
+    color: colors.inkDark,
+    marginBottom: 4,
+  },
+  emptyWallText: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: colors.inkLight,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  emptyWallBtn: {
+    backgroundColor: colors.gold,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    ...shadow.gold,
+  },
+  emptyWallBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: '#FFF',
+  },
+  // V30 Phase D — Prayer Prompt section
+  promptIntro: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: colors.inkLight,
+    marginBottom: spacing.md,
+  },
+  promptBtn: {
+    backgroundColor: colors.gold,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    ...shadow.gold,
+  },
+  promptBtnDisabled: {
+    backgroundColor: colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  promptBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: '#FFF',
+  },
+  promptBtnTextDisabled: {
+    color: colors.inkLight,
+  },
+  promptHint: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 11,
+    color: colors.inkLight,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  promptCooldown: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    color: colors.gold,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  // Phase D modal
+  promptInput: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontFamily: fonts.body,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 100,
+    marginBottom: 4,
+  },
+  promptCharCount: {
+    fontFamily: fonts.caption,
+    fontSize: 11,
+    color: colors.inkLight,
+    textAlign: 'right',
+    marginBottom: spacing.sm,
+  },
+  promptModalHint: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 12,
+    color: colors.inkLight,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   memberRow: {
     flexDirection: 'row',

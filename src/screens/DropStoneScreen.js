@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView,
@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
-import { dropStone, uploadPhoto } from '../lib/api';
+import { dropStone, uploadPhoto, getMyCircles } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, type, spacing, radius, shadow, CATEGORY_LABELS, getCategoryBg } from '../theme';
 
@@ -132,6 +132,37 @@ export default function DropStoneScreen({ navigation }) {
   const [showVersePicker, setShowVersePicker] = useState(false);
   const [selectedTopic, setSelectedTopic]   = useState(null);
 
+  // V30 Phase B — destination picker (Main Wall vs Circle)
+  const [circles, setCircles]                 = useState([]);
+  const [selectedCircleId, setSelectedCircleId] = useState(null);  // null = Main Wall
+
+  // Fetch user's circles on mount for the destination picker
+  // Shape from getMyCircles(): array of membership rows like:
+  //   { circle_id, role, circles: { id, name, logo_url, ... } }
+  useEffect(() => {
+    let mounted = true;
+    async function loadCircles() {
+      try {
+        const data = await getMyCircles(user.id);
+        const rows = Array.isArray(data) ? data : [];
+        // Flatten each row to a usable circle object (id + name from the nested circles)
+        const flat = rows
+          .map(row => {
+            const c = row.circles || row;       // pattern matches CirclesScreen.js
+            if (!c?.id || !c?.name) return null;
+            return { id: c.id, name: c.name, role: row.role };
+          })
+          .filter(Boolean);
+        if (mounted) setCircles(flat);
+      } catch (err) {
+        // Non-fatal — picker just won't show circles
+        console.warn('Failed to load circles for destination picker:', err.message);
+      }
+    }
+    if (user?.id) loadCircles();
+    return () => { mounted = false; };
+  }, [user?.id]);
+
   const stoneScale   = useRef(new Animated.Value(1)).current;
   const stoneOpacity = useRef(new Animated.Value(1)).current;
   const verseOpacity = useRef(new Animated.Value(1)).current;
@@ -216,6 +247,7 @@ export default function DropStoneScreen({ navigation }) {
         photo_url:     finalPhotoUrl,
         scripture_ref: scriptureRef || null,
         type:          stoneType,
+        circle_id:     selectedCircleId,  // V30 — null = Main Wall, UUID = circle
       });
       setTimeout(() => navigation.goBack(), 400);
     } catch (err) {
@@ -344,6 +376,62 @@ export default function DropStoneScreen({ navigation }) {
               🙏 Prayer Request
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* V30 Phase B — Destination picker (Main Wall vs Circle) */}
+        <View style={[styles.destSection, { borderBottomColor: categoryColor + '30' }]}>
+          <Text style={[styles.destLabel, { color: categoryColor }]}>Post to</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.destChipRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Main Wall chip (always first, always present) */}
+            <TouchableOpacity
+              style={[
+                styles.destChip,
+                selectedCircleId === null && { backgroundColor: categoryColor, borderColor: categoryColor },
+              ]}
+              onPress={() => { setSelectedCircleId(null); Haptics.selectionAsync(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                styles.destChipText,
+                selectedCircleId === null && { color: '#FFF' },
+              ]}>
+                🪨 Main Wall{selectedCircleId === null ? ' ✓' : ''}
+              </Text>
+            </TouchableOpacity>
+
+            {/* One chip per circle the user belongs to */}
+            {circles.map(c => (
+              <TouchableOpacity
+                key={c.id}
+                style={[
+                  styles.destChip,
+                  selectedCircleId === c.id && { backgroundColor: categoryColor, borderColor: categoryColor },
+                ]}
+                onPress={() => { setSelectedCircleId(c.id); Haptics.selectionAsync(); }}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.destChipText,
+                    selectedCircleId === c.id && { color: '#FFF' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  🫂 {c.name}{selectedCircleId === c.id ? ' ✓' : ''}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {selectedCircleId !== null && (
+            <Text style={[styles.destHint, { color: categoryColor + 'A0' }]}>
+              🔒 Only members of this circle will see this {stoneType === 'prayer_request' ? 'prayer request' : 'stone'}.
+            </Text>
+          )}
         </View>
 
         <ScrollView
@@ -496,6 +584,47 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: 13,
     color: colors.inkMid,
+  },
+  // V30 Phase B — destination picker
+  destSection: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  destLabel: {
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  destChipRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingRight: spacing.md,
+  },
+  destChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    marginRight: spacing.xs,
+    maxWidth: 200,
+  },
+  destChipText: {
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    color: colors.inkMid,
+  },
+  destHint: {
+    fontFamily: fonts.body,
+    fontStyle: 'italic',
+    fontSize: 11,
+    marginTop: 8,
+    paddingHorizontal: 2,
   },
   verseContainer: { alignItems: 'center', marginBottom: spacing.lg, paddingHorizontal: spacing.md, width: '100%' },
   verse: { fontFamily: fonts.body, fontStyle: 'italic', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 4 },

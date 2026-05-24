@@ -218,6 +218,35 @@ export async function getMyCircles(userId) {
   return apiFetch(`/circles?user_id=${userId}`);
 }
 
+/**
+ * V30 — Fetch all stones (and prayer requests) inside a specific circle.
+ * Members-only: backend verifies the requesting user is an approved member.
+ *
+ * @param {string} circleId
+ * @param {string} userId  - requesting user (for membership check)
+ * @returns {Promise<{ success: boolean, stones: Array }>}
+ */
+export async function getCircleStones(circleId, userId) {
+  return apiFetch(`/circles/${circleId}/stones?user_id=${userId}`);
+}
+
+/**
+ * V30 Phase D — Admin sends a prayer prompt to all circle members.
+ * Backend verifies caller is admin + enforces 24h cooldown.
+ * Returns { success, recipients, last_prompt_sent_at }.
+ *
+ * @param {string} circleId
+ * @param {string} userId  - the admin sending (must match server-side role check)
+ * @param {string} message - the custom prompt text
+ * @returns {Promise<{ success: boolean, recipients: number, last_prompt_sent_at: string }>}
+ */
+export async function sendPrayerPrompt(circleId, userId, message) {
+  return apiFetch(`/circles/${circleId}/prayer-prompt`, {
+    method: 'POST',
+    body: { user_id: userId, message },
+  });
+}
+
 export async function createCircle(ownerId, name, logoUrl = null, isPublic = false) {
   return apiFetch('/circles', {
     method: 'POST',
