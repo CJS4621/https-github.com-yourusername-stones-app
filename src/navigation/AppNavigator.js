@@ -129,14 +129,23 @@ function MainTabs({ navigation }) {
           options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="💛" label="Circles" focused={focused} /> }}
         />
 
-        {/* 3 — Discover */}
+        {/* 3 — Invisible spacer (creates FAB-centered gap) */}
+        <Tab.Screen
+          name="FabSpacer"
+          component={View}
+          options={{
+            tabBarButton: () => <View style={{ flex: 1 }} />,
+          }}
+        />
+
+        {/* 4 — Discover */}
         <Tab.Screen
           name="Discover"
           component={DiscoverScreen}
           options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="Discover" focused={focused} /> }}
         />
 
-        {/* 4 — Me */}
+        {/* 5 — Me */}
         <Tab.Screen
           name="Profile"
           component={ProfileScreen}
@@ -239,7 +248,7 @@ const tabStyles = StyleSheet.create({
   // Floating Drop FAB — true centered above tab bar
   fabContainer: {
     position: 'absolute',
-    bottom: 50,            // 70 (bar height) - 20 (overlap into bar)
+    bottom: 38,            // FAB (64px) center sits exactly on bar (70px) top edge
     left: 0,
     right: 0,
     alignItems: 'center',  // horizontally center the FAB
