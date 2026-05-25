@@ -83,6 +83,30 @@ function MainTabs({ navigation }) {
         onClose={() => setShowMore(false)}
         navigation={navigation}
       />
+
+      {/* Burger menu — floats top-left on every tab screen */}
+      <View style={tabStyles.headerBurgerContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={tabStyles.headerBurger}
+          onPress={() => setShowMore(true)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={tabStyles.headerBurgerIcon}>☰</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Floating Drop FAB — true center above tab bar */}
+      <View style={tabStyles.fabContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={tabStyles.dropFab}
+          onPress={() => navigation.navigate('DropStone')}
+          activeOpacity={0.85}
+        >
+          <Text style={tabStyles.dropFabText}>🪨</Text>
+        </TouchableOpacity>
+      </View>
+
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -105,55 +129,18 @@ function MainTabs({ navigation }) {
           options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="💛" label="Circles" focused={focused} /> }}
         />
 
-        {/* 3 — Drop Stone FAB */}
-        <Tab.Screen
-          name="DropTab"
-          component={View}
-          options={{
-            tabBarButton: () => (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                <TouchableOpacity
-                  style={tabStyles.dropFab}
-                  onPress={() => navigation.navigate('DropStone')}
-                >
-                  <Text style={tabStyles.dropFabText}>🪨</Text>
-                </TouchableOpacity>
-              </View>
-            ),
-          }}
-        />
-
-        {/* 4 — Discover */}
+        {/* 3 — Discover */}
         <Tab.Screen
           name="Discover"
           component={DiscoverScreen}
           options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="Discover" focused={focused} /> }}
         />
 
-        {/* 5 — Me */}
+        {/* 4 — Me */}
         <Tab.Screen
           name="Profile"
           component={ProfileScreen}
           options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🙋" label="Me" focused={focused} /> }}
-        />
-
-        {/* 6 — More */}
-        <Tab.Screen
-          name="MoreTab"
-          component={View}
-          options={{
-            tabBarButton: () => (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <TouchableOpacity
-                  style={{ alignItems: 'center' }}
-                  onPress={() => setShowMore(true)}
-                >
-                  <Text style={{ fontSize: 20, opacity: 0.6 }}>⋯</Text>
-                  <Text style={tabStyles.label}>More</Text>
-                </TouchableOpacity>
-              </View>
-            ),
-          }}
         />
       </Tab.Navigator>
     </>
@@ -249,20 +236,65 @@ const tabStyles = StyleSheet.create({
     color: colors.gold,
     fontFamily: fonts.uiBold,
   },
+  // Floating Drop FAB — true centered above tab bar
+  fabContainer: {
+    position: 'absolute',
+    bottom: 50,            // 70 (bar height) - 20 (overlap into bar)
+    left: 0,
+    right: 0,
+    alignItems: 'center',  // horizontally center the FAB
+    zIndex: 100,
+    elevation: 100,
+  },
   dropFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.gold,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 12,
+    // White ring around for visual lift off the tab bar
+    borderWidth: 4,
+    borderColor: colors.bgCard,
   },
-  dropFabText: { fontSize: 22 },
+  dropFabText: {
+    fontSize: 28,
+  },
+  // Header burger — floats top-left, opens MoreModal slide-up sheet
+  headerBurgerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    paddingTop: 50,        // sits below status bar / notch
+    paddingLeft: 16,
+    zIndex: 50,
+    elevation: 50,
+  },
+  headerBurger: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  headerBurgerIcon: {
+    fontSize: 22,
+    color: colors.inkDark,
+    fontWeight: '600',
+  },
 });
 
 const moreStyles = StyleSheet.create({
