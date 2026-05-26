@@ -15,7 +15,7 @@ async function getUsers(search = '') {
   let query = supabase
     .from('users')
     .select('id, display_name, avatar_url, bio')
-    .order('created_at', { ascending: false })
+    .order('display_name', { ascending: true })
     .limit(50);
 
   if (search.trim()) {
