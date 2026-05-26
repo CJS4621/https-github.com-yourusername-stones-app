@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList, StyleSheet, Text, TouchableOpacity, View,
-  ActivityIndicator, RefreshControl, ScrollView,
+  ActivityIndicator, RefreshControl, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,12 +32,24 @@ export default function WallScreen({ navigation }) {
   const [hasMore, setHasMore]       = useState(true);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [focusedStoneId, setFocusedStoneId] = useState(null);
+  const [searchOpen, setSearchOpen]         = useState(false);
+  const [searchQuery, setSearchQuery]       = useState('');
   const fetchingRef                 = useRef(false);
   const listRef                     = useRef(null);
+  const searchInputRef              = useRef(null);
 
-  // Group stones by year-month with current month always expanded
+  // Group stones by year-month with current month always expanded.
+  // When a search is active, bypass grouping entirely and return a flat list of matches.
   const groupedItems = React.useMemo(() => {
     if (!stones.length) return [];
+
+    // Search mode — flat list of matched stones (no month headers, no collapsing)
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      return stones
+        .filter(s => (s.display_name || '').toLowerCase().includes(q))
+        .map(s => ({ type: 'stone', stone: s, key: s.id }));
+    }
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -126,7 +138,7 @@ export default function WallScreen({ navigation }) {
     });
 
     return items;
-  }, [stones, expandedGroups]);
+  }, [stones, expandedGroups, searchQuery]);
 
   function toggleGroup(groupKey) {
     setExpandedGroups(prev => {
@@ -218,9 +230,41 @@ export default function WallScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.logo}>Stones</Text>
-        <Text style={styles.tagline}>"Thus far the Lord has helped us" — 1 Sam 7:12</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.logo}>Stones</Text>
+          <Text style={styles.tagline}>"Thus far the Lord has helped us" — 1 Sam 7:12</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.searchIconBtn}
+          onPress={() => {
+            const next = !searchOpen;
+            setSearchOpen(next);
+            if (!next) setSearchQuery('');           // clearing on close
+            if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
+          }}
+          activeOpacity={0.6}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.searchIcon}>{searchOpen ? '✕' : '🔍'}</Text>
+        </TouchableOpacity>
       </View>
+
+      {searchOpen && (
+        <View style={styles.searchRow}>
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Search by name..."
+            placeholderTextColor={colors.inkLight}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+      )}
 
       {/* Merged single-row filter strip — type filters + divider + categories */}
       <View style={styles.chipStripWrap}>
@@ -339,11 +383,21 @@ export default function WallScreen({ navigation }) {
             : <Text style={styles.endText}>— End of Wall —</Text>
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🪨</Text>
-              <Text style={styles.emptyTitle}>No stones yet</Text>
-              <Text style={styles.emptyText}>Be the first to drop one.</Text>
-            </View>
+            searchQuery.trim() ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyTitle}>No matches found</Text>
+                <Text style={styles.emptyText}>
+                  No stones from "{searchQuery.trim()}" on this Wall yet. Try a different name, or scroll deeper to load more stones.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🪨</Text>
+                <Text style={styles.emptyTitle}>No stones yet</Text>
+                <Text style={styles.emptyText}>Be the first to drop one.</Text>
+              </View>
+            )
           }
           contentContainerStyle={{ paddingBottom: spacing.xxl }}
         />
@@ -355,11 +409,45 @@ export default function WallScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  searchIconBtn: {
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    padding: 6,
+  },
+  searchIcon: {
+    fontSize: 20,
+    color: colors.inkMid,
+  },
+  searchRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  searchInput: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontFamily: fonts.ui,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logo: {
     fontFamily: type.displayFont,
