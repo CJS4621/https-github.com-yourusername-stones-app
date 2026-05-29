@@ -185,7 +185,7 @@ export default function StoneDetailScreen({ route, navigation }) {
         photo_url: finalPhotoUrl,
       }));
       setShowEdit(false);
-      Alert.alert('Updated! 🪨', 'Your stone has been updated.');
+      Alert.alert('Stone Updated 🪨', 'Your testimony has been refined. Thank you for tending to your story.');
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not update stone.');
     } finally {
