@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ebenezer Stone — for Stones app splash animation
+  Designed for use as the central element in the cinematic splash sequence.
+  Stone descends through holy light beam and settles in light pool.
+  
+  Colors used:
+    #8A6420  — stone deep shadow (back face / depth)
+    #C9A04C  — stone main body (gold)
+    #E0BC68  — stone highlight (light-catching facets, cross, inscription)
+    #6A4D18  — inscription text (engraved feel)
+  
+  Designed at 400×400 viewBox; scales cleanly.
+-->
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Ground shadow ellipse -->
+  <ellipse cx="200" cy="368" rx="135" ry="14" fill="#000000" opacity="0.45"/>
+
+  <!-- Stone back face / depth layer (shifted right+down to suggest dimension) -->
+  <path d="M 130 100
+           L 175 70
+           L 280 80
+           L 320 130
+           L 335 230
+           L 330 320
+           L 305 360
+           L 110 360
+           L 90 320
+           L 85 200
+           L 105 130
+           Z"
+        fill="#8A6420"/>
+
+  <!-- Stone main face (shifted up+left so back face peeks out as shadow) -->
+  <path d="M 130 100
+           L 175 70
+           L 280 80
+           L 320 130
+           L 335 230
+           L 330 320
+           L 305 360
+           L 110 360
+           L 90 320
+           L 85 200
+           L 105 130
+           Z"
+        fill="#C9A04C"
+        transform="translate(-8 -8)"/>
+
+  <!-- Top-left chipped facet highlight (catches light) -->
+  <path d="M 130 100
+           L 175 70
+           L 122 92
+           L 97 138
+           Z"
+        fill="#E0BC68" opacity="0.95"/>
+
+  <!-- Cross emblem (vertical bar) -->
+  <rect x="188" y="118" width="24" height="120" fill="#E0BC68" opacity="0.85"/>
+
+  <!-- Cross emblem (horizontal bar) -->
+  <rect x="160" y="150" width="80" height="22" fill="#E0BC68" opacity="0.85"/>
+
+  <!-- "Ebenezer" inscription -->
+  <text x="200" y="308" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="34"
+        font-weight="400"
+        fill="#6A4D18"
+        letter-spacing="1">Ebenezer</text>
+
+</svg>

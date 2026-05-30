@@ -1,0 +1,116 @@
+STONES SPLASH — COLOR & ASSET CHEAT SHEET
+==========================================
+Last updated: May 2026
+Brand: Stones (faith community app)
+Owner: CJS Digital · info@cjsdigital.ca
+
+
+COLOR PALETTE
+=============
+
+Background (radial gradient, center → edge):
+  #221C16  warm dark brown-black (CENTER)
+  #110D0A  mid dark
+  #050403  outer dark (EDGE)
+
+Light beam (warm gold → cream):
+  #C9A04C  gold base (outer beam)
+  #FFD482  warm gold mid
+  #FFE6A5  cream warm (light caustics, dust motes)
+  #FFF5C8  bright cream-white (inner core)
+  #FFFADC  brightest (sun flare at top)
+
+Ebenezer stone:
+  #8A6420  stone deep shadow
+  #C9A04C  stone main body (gold — matches beam)
+  #E0BC68  stone highlight (top-left chip, cross emblem)
+  #6A4D18  inscription "Ebenezer"
+
+Verse + title text:
+  #C9A04C  gold (title "STONES", emphasized verse phrase, reference line)
+  #FFE6A5  warm cream (main verse body)
+
+
+TYPOGRAPHY
+==========
+
+Primary serif: Georgia
+Acceptable substitutes: Playfair Display, Cormorant, Source Serif Pro
+
+"STONES" title:
+  - 48-56px equivalent
+  - Regular weight (NOT bold)
+  - Color: #C9A04C
+  - Letter spacing: +3-4px
+
+Verse body:
+  - 16-18px equivalent
+  - Italic
+  - Color: #FFE6A5 at 85% opacity
+  - Line height: 1.6-1.7
+
+Verse reference "— 1 Samuel 7:12 (ESV)":
+  - 12-13px equivalent
+  - Italic
+  - Color: #C9A04C at 80% opacity
+
+The phrase "Till now the Lord has helped us" (within the verse) should be
+slightly emphasized — either gold color (#C9A04C) or slightly brighter.
+
+
+VERSE TEXT (exact wording — ESV)
+=================================
+
+"Then Samuel took a stone and set it up between Mizpah and Shen and called
+its name Ebenezer; for he said, 'Till now the Lord has helped us.'"
+
+— 1 Samuel 7:12 (ESV)
+
+
+CANVAS
+======
+
+Target: 1080 × 1920 px (portrait)
+Frame rate: 60 fps
+Duration: 7.5 seconds total
+Loop: NO — ends cleanly
+Final frame: fade to transparent (so app home feed can show through)
+
+
+FILE SIZE TARGETS
+=================
+
+Lottie JSON:   under 200 KB ideal, under 500 KB acceptable
+MP4 render:    standard quality, ~5-15 MB acceptable
+AE source:     no size limit
+
+
+REFERENCE FILES PROVIDED
+========================
+
+1. stones-splash-mockup.html
+   Open in browser — this is the PRIMARY spec.
+   Watch it play to see exactly how the animation should feel.
+
+2. stones-splash-spec.html
+   Detailed visual spec doc — open in browser for reference.
+
+3. ebenezer-stone.svg
+   Clean standalone SVG of the central stone graphic.
+   Import directly into After Effects or trace as needed.
+
+4. splash-colors.txt
+   This file — quick reference.
+
+5. stones-splash-fiverr-brief.md
+   The main project brief / what's expected.
+
+
+CONTACT
+=======
+
+Cliff McAuley
+CJS Digital
+info@cjsdigital.ca
+
+Response time: within 24 hours of any message during business days.
