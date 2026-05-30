@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stones",
     "slug": "stones-fresh",
-    "version": "1.0.29",
+    "version": "1.0.31",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,7 @@
 	 "ios": {
 	  "supportsTablet": true,
 	  "bundleIdentifier": "ca.stonesapp.stones",
-	  "buildNumber": "29",
+	  "buildNumber": "31",
 	  "infoPlist": {
 		"ITSAppUsesNonExemptEncryption": false
 	  }
