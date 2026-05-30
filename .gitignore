@@ -41,3 +41,5 @@ yarn-error.*
 /ios
 /android
 "Node Red Backup/" 
+node-red-backup/ 
+node-red-backups/ 
