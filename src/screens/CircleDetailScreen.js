@@ -51,6 +51,9 @@ export default function CircleDetailScreen({ route, navigation }) {
   const [circleStones, setCircleStones] = useState([]);
   const [loadingStones, setLoadingStones] = useState(true);
 
+  // V31 Polish — track which circle stones the current user has prayed for
+  const [prayedIds, setPrayedIds] = useState(new Set());
+
   // V30 Phase D — Prayer Prompt (admin-only)
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [promptText, setPromptText] = useState('');
@@ -173,9 +176,23 @@ export default function CircleDetailScreen({ route, navigation }) {
       const result = await getCircleStones(currentCircle.id, user.id);
       const list = Array.isArray(result?.stones) ? result.stones : (Array.isArray(result) ? result : []);
       setCircleStones(list);
+
+      // V31 Polish — fetch user's prayed stones to render the correct "prayed" state
+      if (user?.id && list.length > 0) {
+        const ids = list.map(s => s.id);
+        const { data: prayedRows } = await supabase
+          .from('prayers')
+          .select('stone_id')
+          .eq('user_id', user.id)
+          .in('stone_id', ids);
+        if (prayedRows) setPrayedIds(new Set(prayedRows.map(r => r.stone_id)));
+      } else {
+        setPrayedIds(new Set());
+      }
     } catch (err) {
       console.log('Error loading circle stones:', err);
       setCircleStones([]);
+      setPrayedIds(new Set());
     } finally {
       setLoadingStones(false);
     }
@@ -724,6 +741,7 @@ export default function CircleDetailScreen({ route, navigation }) {
               <View key={stone.id} style={{ marginBottom: spacing.sm }}>
                 <StoneCard
                   stone={stone}
+                  initialPrayed={prayedIds.has(stone.id)}
                   onPress={() => navigation.navigate('StoneDetail', { stone })}
                   onPressUser={(userId) => navigation.navigate('PublicProfile', { userId })}
                 />

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView,
-  Platform, Animated, Modal, FlatList,
+  Platform, Animated, Modal, FlatList, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -119,8 +119,9 @@ const VERSE_TOPICS = [
   ]},
 ];
 
-export default function DropStoneScreen({ navigation }) {
+export default function DropStoneScreen({ navigation, route }) {
   const { user } = useAuth();
+  const presetCircleId = route?.params?.presetCircleId || null;
   const [text, setText]                     = useState('');
   const [stoneType, setStoneType]           = useState('stone');
   const [category, setCategory]             = useState('faith');
@@ -133,8 +134,31 @@ export default function DropStoneScreen({ navigation }) {
   const [selectedTopic, setSelectedTopic]   = useState(null);
 
   // V30 Phase B — destination picker (Main Wall vs Circle)
+  // V31 Polish — accept presetCircleId from CircleDetailScreen's "Drop the first one" entry
   const [circles, setCircles]                 = useState([]);
-  const [selectedCircleId, setSelectedCircleId] = useState(null);  // null = Main Wall
+  const [selectedCircleId, setSelectedCircleId] = useState(presetCircleId);  // null = Main Wall
+
+  // V31 Polish — auto-scroll horizontal chip row so the preset chip is fully visible
+  // Uses real measured chip widths (via onLayout) instead of guessing — accurate every time.
+  const destScrollRef = useRef(null);
+  const chipLayoutsRef = useRef({});            // { [circleId]: { x, width } }
+  const destViewportWidthRef = useRef(0);       // measured visible width of the ScrollView
+  const presetScrolledRef = useRef(false);
+
+  function tryScrollPresetIntoView() {
+    if (!presetCircleId || presetScrolledRef.current) return;
+    const layout = chipLayoutsRef.current[presetCircleId];
+    const viewport = destViewportWidthRef.current;
+    if (!layout || !viewport || !destScrollRef.current) return;
+    // Position chip so its right edge sits ~20px from the right of the visible area
+    const targetX = layout.x + layout.width + 20 - viewport;
+    try {
+      destScrollRef.current.scrollTo({ x: Math.max(0, targetX), y: 0, animated: true });
+      presetScrolledRef.current = true;
+    } catch (e) {
+      // Non-fatal — chip just won't auto-scroll
+    }
+  }
 
   // Fetch user's circles on mount for the destination picker
   // Shape from getMyCircles(): array of membership rows like:
@@ -382,10 +406,15 @@ export default function DropStoneScreen({ navigation }) {
         <View style={[styles.destSection, { borderBottomColor: categoryColor + '30' }]}>
           <Text style={[styles.destLabel, { color: categoryColor }]}>Post to</Text>
           <ScrollView
+            ref={destScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.destChipRow}
             keyboardShouldPersistTaps="handled"
+            onLayout={(e) => {
+              destViewportWidthRef.current = e.nativeEvent.layout.width;
+              tryScrollPresetIntoView();
+            }}
           >
             {/* Main Wall chip (always first, always present) */}
             <TouchableOpacity
@@ -413,6 +442,11 @@ export default function DropStoneScreen({ navigation }) {
                   selectedCircleId === c.id && { backgroundColor: categoryColor, borderColor: categoryColor },
                 ]}
                 onPress={() => { setSelectedCircleId(c.id); Haptics.selectionAsync(); }}
+                onLayout={(e) => {
+                  const { x, width } = e.nativeEvent.layout;
+                  chipLayoutsRef.current[c.id] = { x, width };
+                  if (c.id === presetCircleId) tryScrollPresetIntoView();
+                }}
                 activeOpacity={0.8}
               >
                 <Text
@@ -546,6 +580,20 @@ export default function DropStoneScreen({ navigation }) {
               {uploadingPhoto ? '⏳ Uploading...' : photoUri ? '✓ Photo Selected — Tap to Change' : '+ Add a Photo'}
             </Text>
           </TouchableOpacity>
+
+          {/* V31 Polish — Photo thumbnail preview (Brendon V30 feedback) */}
+          {photoUri && !uploadingPhoto && (
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} resizeMode="cover" />
+              <TouchableOpacity
+                style={styles.photoRemoveBtn}
+                onPress={() => setPhotoUri(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.photoRemoveBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -658,6 +706,34 @@ const styles = StyleSheet.create({
   verseHint: { fontFamily: fonts.caption, fontSize: 11, fontStyle: 'italic', marginBottom: spacing.lg, marginLeft: 2 },
   photoBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: radius.md, padding: spacing.md, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.4)' },
   photoBtnText: { fontFamily: fonts.ui, fontSize: 14 },
+  photoPreviewWrap: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    position: 'relative',
+  },
+  photoPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  photoRemoveBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoRemoveBtnText: {
+    color: '#FFF',
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    lineHeight: 14,
+  },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 40, maxHeight: '80%', ...shadow.gold },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
