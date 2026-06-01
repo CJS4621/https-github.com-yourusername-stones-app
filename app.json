@@ -10,8 +10,8 @@
     "scheme": "stones",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "cover",
+      "backgroundColor": "#040200"
     },
 	 "ios": {
 	  "supportsTablet": true,
