@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Linking, Platform } from 'react-native';
 import { useFonts, Lora_400Regular, Lora_700Bold } from '@expo-google-fonts/lora';
@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import CinematicSplash from './src/screens/CinematicSplash';
 import { supabase } from './src/lib/supabase';
 import { setFocusStone } from './src/lib/wallFocus';
 import * as Notifications from 'expo-notifications';
@@ -91,6 +92,8 @@ function handleNotificationPayload(data, navigationRef) {
 
 export default function App() {
   const navigationRef = useRef(null);
+  // V32 — Cinematic splash on cold launch (skipped if notification cold-start)
+  const [splashDone, setSplashDone] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     Lora_400Regular,
@@ -157,6 +160,8 @@ export default function App() {
       if (response) {
         const data = response.notification?.request?.content?.data;
         console.log('🔔 Cold-start notification:', data);
+        // V32 — Skip cinematic splash; user wants their notification, not 7.9s of animation
+        setSplashDone(true);
         // Small delay so navigator is mounted before we navigate
         setTimeout(() => handleNotificationPayload(data, navigationRef), 600);
       }
@@ -193,6 +198,16 @@ export default function App() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Text>Loading fonts...</Text>
       </View>
+    );
+  }
+
+  // V32 — Cinematic splash plays once fonts are loaded, before the main app mounts.
+  // splashDone is also set to true when a notification cold-start is detected.
+  if (!splashDone) {
+    return (
+      <SafeAreaProvider>
+        <CinematicSplash onFinish={() => setSplashDone(true)} />
+      </SafeAreaProvider>
     );
   }
 
