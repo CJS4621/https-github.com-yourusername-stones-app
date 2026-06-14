@@ -273,7 +273,20 @@ export default function DropStoneScreen({ navigation, route }) {
         type:          stoneType,
         circle_id:     selectedCircleId,  // V30 — null = Main Wall, UUID = circle
       });
-      setTimeout(() => navigation.goBack(), 400);
+      // Signal target screen to force-refresh on next focus (bypasses caching/race conditions).
+      // Stone dropped to: Main Wall (selectedCircleId=null) → Main tab; or to a Circle → CircleDetail.
+      setTimeout(() => {
+        if (selectedCircleId) {
+          // Stone was dropped into a circle — go back; CircleDetail will pick up the refresh signal
+          navigation.goBack();
+        } else {
+          // Stone went to main Wall — navigate there with refresh param
+          navigation.navigate('Main', {
+            screen: 'Wall',
+            params: { stoneDroppedAt: Date.now() },
+          });
+        }
+      }, 400);
     } catch (err) {
       stoneScale.setValue(1);
       stoneOpacity.setValue(1);

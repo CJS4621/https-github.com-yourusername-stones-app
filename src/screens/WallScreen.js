@@ -20,7 +20,7 @@ const TYPE_FILTERS = [
 ];
 const CATEGORIES = Object.keys(CATEGORY_LABELS);
 
-export default function WallScreen({ navigation }) {
+export default function WallScreen({ navigation, route }) {
   const { user } = useAuth();
   const [stones, setStones]         = useState([]);
   const [prayedIds, setPrayedIds]   = useState(new Set());
@@ -210,11 +210,24 @@ export default function WallScreen({ navigation }) {
       setLoading(true);
       setStones([]);
       fetchPrayedIds();
-      fetchStones(1, category, true, typeFilter);
+
+      // If user just dropped a stone, give Supabase a moment to propagate before fetching.
+      // Also reset fetchingRef in case it was stuck from an interrupted previous fetch.
+      const stoneDroppedAt = route?.params?.stoneDroppedAt;
+      if (stoneDroppedAt) {
+        fetchingRef.current = false;  // Force-clear any stale lock
+        setTimeout(() => {
+          fetchStones(1, category, true, typeFilter);
+          // Clear the param so this doesn't re-trigger on later focuses
+          navigation.setParams({ stoneDroppedAt: undefined });
+        }, 600);
+      } else {
+        fetchStones(1, category, true, typeFilter);
+      }
 
       const pending = consumeFocusStone();
       if (pending) setTimeout(() => focusOnStone(pending), 600);
-    }, [category, typeFilter])
+    }, [category, typeFilter, route?.params?.stoneDroppedAt])
   );
 
   function handleRefresh() {
