@@ -11,8 +11,18 @@ import AppNavigator from './src/navigation/AppNavigator';
 import CinematicSplash from './src/screens/CinematicSplash';
 import { supabase } from './src/lib/supabase';
 import { setFocusStone } from './src/lib/wallFocus';
+import { acceptInvitation } from './src/lib/api';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+
+// V32 — Pending invitation token (set by deep-link handler, consumed when user is signed in)
+let pendingInvitationToken = null;
+function setPendingInvitationToken(t) { pendingInvitationToken = t; }
+function takePendingInvitationToken() {
+  const t = pendingInvitationToken;
+  pendingInvitationToken = null;
+  return t;
+}
 
 // Set notification handler
 Notifications.setNotificationHandler({
@@ -44,6 +54,68 @@ async function registerForPushNotifications() {
   })).data;
 
   return token;
+}
+
+// V32 — Parse a deep link URL and extract an invitation token if present.
+// Handles both `stones://accept-invitation?token=XXX` and
+// `https://stonesapp.ca/accept-invitation.html?token=XXX` (universal link future).
+function parseInvitationToken(url) {
+  if (!url) return null;
+  try {
+    // Accept several URL patterns
+    const isInvitation = url.includes('accept-invitation') || url.includes('accept_invitation');
+    if (!isInvitation) return null;
+    const queryIdx = url.indexOf('?');
+    if (queryIdx === -1) return null;
+    const params = new URLSearchParams(url.substring(queryIdx + 1));
+    const token = params.get('token');
+    return token && token.length >= 8 ? token : null;
+  } catch (e) {
+    console.warn('parseInvitationToken error:', e.message);
+    return null;
+  }
+}
+
+// V32 — Attempt to redeem a pending invitation. Called once the user is signed in.
+// Silently no-ops if there's no pending token. Shows alert on result.
+async function tryAcceptPendingInvitation(navigationRef) {
+  const token = takePendingInvitationToken();
+  if (!token) return;
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      // User not signed in — put it back, will retry on next auth event
+      setPendingInvitationToken(token);
+      return;
+    }
+
+    console.log('🫂 Attempting to accept pending invitation...');
+    const result = await acceptInvitation(token, session.user.id);
+
+    if (result?.success) {
+      const circleName = result.circle_name || 'the circle';
+      console.log(`✅ Joined ${circleName}`);
+      // Navigate to the circle
+      setTimeout(() => {
+        try {
+          navigationRef.current?.navigate?.('CircleDetail', {
+            circle: { id: result.circle_id, _isStub: true },
+            role: 'member',
+          });
+        } catch (e) {
+          // Fallback to Circles tab
+          try {
+            navigationRef.current?.navigate?.('Main', { screen: 'Circles' });
+          } catch (_) {}
+        }
+      }, 600);
+    }
+  } catch (err) {
+    console.warn('Pending invitation accept failed:', err.message);
+    // Don't surface to user — they may not have known about the invitation.
+    // Log only; if it failed because email doesn't match etc, silent fail is correct.
+  }
 }
 
 // Route a notification payload to the right place in the app
@@ -135,6 +207,9 @@ export default function App() {
         } catch (err) {
           console.log('Push token error:', err);
         }
+
+        // V32 — If a deep-link invitation token is queued, redeem it now
+        tryAcceptPendingInvitation(navigationRef);
       }
     });
 
@@ -169,12 +244,36 @@ export default function App() {
 
     // Handle deep link when app is already open
     const subscription = Linking.addEventListener('url', ({ url }) => {
-      if (url) supabase.auth.getSession();
+      if (!url) return;
+
+      // V32 — Check for invitation token first
+      const inviteToken = parseInvitationToken(url);
+      if (inviteToken) {
+        console.log('🫂 Invitation deep link detected (warm)');
+        setPendingInvitationToken(inviteToken);
+        tryAcceptPendingInvitation(navigationRef);
+        return;
+      }
+
+      // Otherwise, treat as Supabase magic-link
+      supabase.auth.getSession();
     });
 
     // Handle deep link when app is opened from closed state
     Linking.getInitialURL().then((url) => {
-      if (url) supabase.auth.getSession();
+      if (!url) return;
+
+      // V32 — Check for invitation token first
+      const inviteToken = parseInvitationToken(url);
+      if (inviteToken) {
+        console.log('🫂 Invitation deep link detected (cold-start)');
+        setPendingInvitationToken(inviteToken);
+        // Will be redeemed when auth settles (see SIGNED_IN handler above)
+        return;
+      }
+
+      // Otherwise, treat as Supabase magic-link
+      supabase.auth.getSession();
     });
 
     return () => {

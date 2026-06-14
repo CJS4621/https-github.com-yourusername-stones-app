@@ -187,7 +187,8 @@ export default function CirclesScreen({ navigation }) {
       {/* Header */}
       <View style={s.header}>
         <View style={s.headerTop}>
-          <View style={{ flex: 1 }}>
+          <View style={{ width: 70 }} />
+          <View style={s.titleContainer}>
             <Text style={s.title}>Circles</Text>
             <Text style={s.subtitle}>Your private faith communities</Text>
           </View>
@@ -246,12 +247,18 @@ const s = StyleSheet.create({
     fontFamily: type.displayFont,
     fontSize: type.displaySize,
     color: colors.inkDark,
+    textAlign: 'center',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   subtitle: {
     fontFamily: fonts.body,
     fontSize: type.captionSize,
     color: colors.inkLight,
     marginTop: 2,
+    textAlign: 'center',
   },
   createBtn: {
     backgroundColor: colors.gold,

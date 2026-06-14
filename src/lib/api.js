@@ -247,10 +247,10 @@ export async function sendPrayerPrompt(circleId, userId, message) {
   });
 }
 
-export async function createCircle(ownerId, name, logoUrl = null, isPublic = false) {
+export async function createCircle(ownerId, name, logoUrl = null, isPublic = false, description = null) {
   return apiFetch('/circles', {
     method: 'POST',
-    body: { owner_id: ownerId, name, logo_url: logoUrl, is_public: isPublic },
+    body: { owner_id: ownerId, name, description, logo_url: logoUrl, is_public: isPublic },
   });
 }
 
@@ -315,9 +315,10 @@ export async function sendEncouragement(stoneId, userId) {
   });
 }
 
-export async function editCircle(circleId, name, logoUrl = null, isPublic = undefined) {
+export async function editCircle(circleId, name, logoUrl = null, isPublic = undefined, description = undefined) {
   const body = { name, logo_url: logoUrl };
   if (isPublic !== undefined) body.is_public = isPublic;
+  if (description !== undefined) body.description = description;
   return apiFetch(`/circles/${circleId}`, {
     method: 'PATCH',
     body,
@@ -397,4 +398,56 @@ export async function getDailyStreak(userId) {
  */
 export async function deleteAccount(userId) {
   return apiFetch(`/users/${userId}`, { method: 'DELETE' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V32 — Circle Email Invitations
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Invite someone to a circle via email.
+ * If the email matches an existing Stones user, the endpoint returns 409
+ * with already_member info instead of sending an email.
+ *
+ * @param {string} circleId - The circle to invite to
+ * @param {string} invitedBy - User ID of the person sending the invitation
+ * @param {string} invitedEmail - Email address of the invitee
+ * @returns {Promise<{success: boolean, message: string, email: string}>}
+ * @throws Error with message from server on failure (rate limit, already member, etc.)
+ */
+export async function inviteToCircleByEmail(circleId, invitedBy, invitedEmail) {
+  return apiFetch(`/circles/${circleId}/invite-email`, {
+    method: 'POST',
+    body: {
+      invited_by: invitedBy,
+      invited_email: invitedEmail
+    }
+  });
+}
+
+/**
+ * Look up an invitation by token (read-only — does not accept).
+ * Used to fetch circle/inviter details so the UI can show what the user is joining.
+ *
+ * @param {string} token - The invitation token
+ * @returns {Promise<{status, invitation, circle, inviter, is_existing_user, already_member}>}
+ */
+export async function getInvitation(token) {
+  return apiFetch(`/invitation/${encodeURIComponent(token)}`, { method: 'GET' });
+}
+
+/**
+ * Accept an invitation by token.
+ * The user must already be signed in (user_id is required).
+ * Validates that the user's email matches the invitation's email.
+ *
+ * @param {string} token - The invitation token
+ * @param {string} userId - The accepting user's ID
+ * @returns {Promise<{success: boolean, circle_id: string, circle_name: string, message: string}>}
+ */
+export async function acceptInvitation(token, userId) {
+  return apiFetch('/accept-invitation', {
+    method: 'POST',
+    body: { token, user_id: userId }
+  });
 }

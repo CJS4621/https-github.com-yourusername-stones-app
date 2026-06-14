@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, Modal, Alert, Image, ScrollView, TextInput,
-  KeyboardAvoidingView, Platform, Switch
+  KeyboardAvoidingView, Platform, Switch, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCircleMembers, inviteToCircle, leaveCircle, deleteCircle, editCircle, uploadPhoto, getPendingRequests, approveJoinRequest, denyJoinRequest, getCircleStones, sendPrayerPrompt } from '../lib/api';
+import { getCircleMembers, inviteToCircle, inviteToCircleByEmail, leaveCircle, deleteCircle, editCircle, uploadPhoto, getPendingRequests, approveJoinRequest, denyJoinRequest, getCircleStones, sendPrayerPrompt } from '../lib/api';
 import StoneCard from '../components/StoneCard';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
@@ -35,6 +35,9 @@ export default function CircleDetailScreen({ route, navigation }) {
   const [members, setMembers]             = useState([]);
   const [loading, setLoading]             = useState(true);
   const [showInvite, setShowInvite]       = useState(false);
+  const [inviteMode, setInviteMode]       = useState('username'); // 'username' | 'email'
+  const [inviteEmail, setInviteEmail]     = useState('');
+  const [sendingEmail, setSendingEmail]   = useState(false);
   const [showEdit, setShowEdit]           = useState(false);
   const [editName, setEditName]           = useState(initialCircle.name || '');
   const [editLogo, setEditLogo]           = useState(initialCircle.logo_url || null);
@@ -341,6 +344,44 @@ export default function CircleDetailScreen({ route, navigation }) {
     }
   }
 
+  async function handleSendEmailInvite() {
+    const emailTrimmed = inviteEmail.trim().toLowerCase();
+    if (!emailTrimmed) {
+      Alert.alert('Required', 'Please enter an email address.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      await inviteToCircleByEmail(currentCircle.id, user.id, emailTrimmed);
+      setInviteEmail('');
+      setShowInvite(false);
+      Alert.alert(
+        'Invitation Sent! 📧',
+        `An invitation email has been sent to ${emailTrimmed}. They have 30 days to accept.`
+      );
+    } catch (err) {
+      // Server returns 409 with already_member when email matches an existing member
+      const errMsg = err.message || 'Could not send invitation.';
+      if (errMsg.toLowerCase().includes('already in this circle')) {
+        Alert.alert('Already a Member', errMsg);
+      } else if (errMsg.toLowerCase().includes('5 invitations per day')) {
+        Alert.alert('Daily Limit Reached', errMsg);
+      } else if (errMsg.toLowerCase().includes('recently')) {
+        Alert.alert('Invitation Already Sent', errMsg);
+      } else {
+        Alert.alert('Error', errMsg);
+      }
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   async function handleLeave() {
     Alert.alert(
       'Leave Circle',
@@ -580,51 +621,111 @@ export default function CircleDetailScreen({ route, navigation }) {
 
       {/* Invite Modal */}
       <Modal visible={showInvite} animationType="slide" transparent onRequestClose={() => setShowInvite(false)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Add Member 🫂</Text>
-            <Text style={s.modalSubtitle}>
-              {members.length} of 12 Members · {12 - members.length} Spots Remaining
-            </Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={s.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={s.modalCard}>
+                  <Text style={s.modalTitle}>Add Member 🫂</Text>
+                  <Text style={s.modalSubtitle}>
+                    {members.length} of 12 Members · {12 - members.length} Spots Remaining
+                  </Text>
 
-            <View style={s.searchWrapper}>
-              <Text style={s.searchIcon}>🔍</Text>
-              <TextInput
-                style={s.searchField}
-                placeholder="Search by name..."
-                placeholderTextColor={colors.inkLight}
-                value={searchQuery}
-                onChangeText={handleSearch}
-                autoCapitalize="none"
-                autoFocus
-              />
+                  {/* Toggle Tabs */}
+                  <View style={s.inviteTabsRow}>
+              <TouchableOpacity
+                style={[s.inviteTab, inviteMode === 'username' && s.inviteTabActive]}
+                onPress={() => setInviteMode('username')}
+              >
+                <Text style={[s.inviteTabText, inviteMode === 'username' && s.inviteTabTextActive]}>
+                  👤 By Stones User
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.inviteTab, inviteMode === 'email' && s.inviteTabActive]}
+                onPress={() => setInviteMode('email')}
+              >
+                <Text style={[s.inviteTabText, inviteMode === 'email' && s.inviteTabTextActive]}>
+                  📧 By Email
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {searchResults.map(u => (
-              <TouchableOpacity
-                key={u.id}
-                style={s.searchResult}
-                onPress={() => handleInvite(u)}
-                disabled={inviting === u.id}
-              >
-                {u.avatar_url
-                  ? <Image source={{ uri: u.avatar_url }} style={s.searchAvatar} />
-                  : (
-                    <View style={s.searchAvatarPlaceholder}>
-                      <Text style={s.searchAvatarText}>{(u.display_name || '?')[0].toUpperCase()}</Text>
-                    </View>
-                  )
-                }
-                <Text style={s.searchName}>{u.display_name}</Text>
-                {inviting === u.id
-                  ? <ActivityIndicator color={colors.gold} />
-                  : <Text style={s.addBtn}>+ Add</Text>
-                }
-              </TouchableOpacity>
-            ))}
+            {inviteMode === 'username' ? (
+              <>
+                <View style={s.searchWrapper}>
+                  <Text style={s.searchIcon}>🔍</Text>
+                  <TextInput
+                    style={s.searchField}
+                    placeholder="Search by name..."
+                    placeholderTextColor={colors.inkLight}
+                    value={searchQuery}
+                    onChangeText={handleSearch}
+                    autoCapitalize="none"
+                    autoFocus
+                  />
+                </View>
 
-            {searchQuery.length >= 2 && searchResults.length === 0 && (
-              <Text style={s.noResults}>No Users Found</Text>
+                {searchResults.map(u => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={s.searchResult}
+                    onPress={() => handleInvite(u)}
+                    disabled={inviting === u.id}
+                  >
+                    {u.avatar_url
+                      ? <Image source={{ uri: u.avatar_url }} style={s.searchAvatar} />
+                      : (
+                        <View style={s.searchAvatarPlaceholder}>
+                          <Text style={s.searchAvatarText}>{(u.display_name || '?')[0].toUpperCase()}</Text>
+                        </View>
+                      )
+                    }
+                    <Text style={s.searchName}>{u.display_name}</Text>
+                    {inviting === u.id
+                      ? <ActivityIndicator color={colors.gold} />
+                      : <Text style={s.addBtn}>+ Add</Text>
+                    }
+                  </TouchableOpacity>
+                ))}
+
+                {searchQuery.length >= 2 && searchResults.length === 0 && (
+                  <Text style={s.noResults}>No Users Found</Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={s.emailInviteHelpText}>
+                  Send an email invitation to anyone — even if they don't have Stones yet.
+                </Text>
+                <TextInput
+                  style={s.emailInput}
+                  placeholder="friend@example.com"
+                  placeholderTextColor={colors.inkLight}
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                  editable={!sendingEmail}
+                />
+                <TouchableOpacity
+                  style={[s.emailSendBtn, sendingEmail && { opacity: 0.6 }]}
+                  onPress={handleSendEmailInvite}
+                  disabled={sendingEmail}
+                >
+                  {sendingEmail
+                    ? <ActivityIndicator color="#FFF" />
+                    : <Text style={s.emailSendBtnText}>Send Invitation 📧</Text>
+                  }
+                </TouchableOpacity>
+                <Text style={s.emailInviteFootnote}>
+                  Invitation expires in 30 days · Max 5 per day
+                </Text>
+              </>
             )}
 
             <TouchableOpacity
@@ -633,12 +734,17 @@ export default function CircleDetailScreen({ route, navigation }) {
                 setShowInvite(false);
                 setSearchQuery('');
                 setSearchResults([]);
+                setInviteEmail('');
+                setInviteMode('username');
               }}
             >
               <Text style={s.modalCancelText}>Done</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Header — two rows */}
@@ -1254,6 +1360,74 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+  },
+  inviteTabsRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: 4,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inviteTab: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+  },
+  inviteTabActive: {
+    backgroundColor: colors.gold,
+  },
+  inviteTabText: {
+    fontFamily: fonts.ui,
+    fontSize: 13,
+    color: colors.inkMid,
+    textAlign: 'center',
+  },
+  inviteTabTextActive: {
+    color: '#FFF',
+    fontFamily: fonts.uiBold,
+  },
+  emailInviteHelpText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkMid,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  emailInput: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontFamily: fonts.ui,
+    fontSize: type.uiSize,
+    color: colors.inkDark,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  emailSendBtn: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  emailSendBtnText: {
+    fontFamily: fonts.uiBold,
+    fontSize: type.uiSize,
+    color: '#FFF',
+  },
+  emailInviteFootnote: {
+    fontFamily: fonts.caption,
+    fontSize: 11,
+    color: colors.inkLight,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   searchIcon: { fontSize: 16, marginRight: spacing.sm },
   searchField: {
