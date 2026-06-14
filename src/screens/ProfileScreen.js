@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getProfile, getFollowCounts, getJourney, sendInvite, uploadPhoto, updateProfile, getDailyStreak } from '../lib/api';
 import { signOut, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import ProfileSetupScreen from './ProfileSetupScreen';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 import { useNavigation } from '@react-navigation/native';
 
@@ -64,6 +65,7 @@ export default function ProfileScreen() {
   const [editBio, setEditBio]               = useState('');
   const [editSaving, setEditSaving]         = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showNameEdit, setShowNameEdit]     = useState(false);  // NEW — Display Name & Privacy modal
   const navigation = useNavigation();
 
   useFocusEffect(
@@ -91,7 +93,6 @@ export default function ProfileScreen() {
   );
 
   function openEdit() {
-    setEditName(profile?.display_name || '');
     setEditBio(profile?.bio || '');
     setShowEdit(true);
   }
@@ -100,7 +101,6 @@ export default function ProfileScreen() {
     setEditSaving(true);
     try {
       const updated = await updateProfile(user.id, {
-        display_name: editName.trim(),
         bio: editBio.trim(),
       });
       setProfile(p => ({ ...p, ...updated }));
@@ -109,6 +109,17 @@ export default function ProfileScreen() {
       Alert.alert('Error', err.message || 'Could not save profile.');
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  // Called after ProfileSetupScreen saves successfully — reload profile so Wall shows new display
+  async function handleNameSaved() {
+    setShowNameEdit(false);
+    try {
+      const refreshed = await getProfile(user.id);
+      setProfile(refreshed);
+    } catch (_) {
+      // Non-fatal — Wall will refresh on next focus
     }
   }
 
@@ -227,19 +238,11 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Edit Profile Modal */}
+      {/* Edit Bio Modal — display_name is managed via the new ProfileSetup modal */}
       <Modal visible={showEdit} animationType="slide" transparent onRequestClose={() => setShowEdit(false)}>
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Edit Profile</Text>
-            <TextInput
-              style={s.modalInput}
-              placeholder="Display name"
-              placeholderTextColor={colors.inkLight}
-              value={editName}
-              onChangeText={setEditName}
-              autoCapitalize="words"
-            />
+            <Text style={s.modalTitle}>Edit Bio</Text>
             <TextInput
               style={[s.modalInput, s.modalInputMulti]}
               placeholder="Bio (optional)"
@@ -256,7 +259,7 @@ export default function ProfileScreen() {
             >
               {editSaving
                 ? <ActivityIndicator color="#FFF" />
-                : <Text style={s.modalBtnText}>Save Profile</Text>
+                : <Text style={s.modalBtnText}>Save Bio</Text>
               }
             </TouchableOpacity>
             <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShowEdit(false)}>
@@ -264,6 +267,23 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Display Name & Privacy Modal — uses ProfileSetupScreen in edit mode */}
+      <Modal visible={showNameEdit} animationType="slide" onRequestClose={() => setShowNameEdit(false)}>
+        {profile && (
+          <ProfileSetupScreen
+            user={{ id: user.id }}
+            mode="edit"
+            existingData={{
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              display_format: profile.display_format,
+            }}
+            onComplete={handleNameSaved}
+            onCancel={() => setShowNameEdit(false)}
+          />
+        )}
       </Modal>
 
       <ScrollView contentContainerStyle={s.scroll}>
@@ -287,14 +307,16 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={openEdit}>
+          <TouchableOpacity onPress={() => setShowNameEdit(true)}>
             <Text style={s.name}>{profile?.display_name}</Text>
           </TouchableOpacity>
           {memberSince ? <Text style={s.since}>Member since {memberSince}</Text> : null}
-          {profile?.bio
-            ? <Text style={s.bio}>{profile.bio}</Text>
-            : <Text style={s.bioEmpty}>Tap your name or photo to edit profile</Text>
-          }
+          <TouchableOpacity onPress={openEdit}>
+            {profile?.bio
+              ? <Text style={s.bio}>{profile.bio}</Text>
+              : <Text style={s.bioEmpty}>Tap to add a bio · Tap your name to edit display</Text>
+            }
+          </TouchableOpacity>
         </View>
 
         {/* Stats — 4 columns now: Stones · Streak · Followers · Following */}

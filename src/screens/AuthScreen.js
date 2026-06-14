@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
   ScrollView, Modal
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import ProfileSetupScreen from './ProfileSetupScreen';
 import { colors, fonts, type, spacing, radius, shadow } from '../theme';
 
 export default function AuthScreen() {
@@ -15,7 +17,110 @@ export default function AuthScreen() {
   const [name, setName]               = useState('');
   const [loading, setLoading]         = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeSource, setWelcomeSource] = useState('email');  // 'email' or 'apple'
   const [resetSent, setResetSent]     = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  // Profile Setup modal — shown after Apple sign-in when name is missing
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [setupUser, setSetupUser] = useState(null);
+
+  // Check if Sign in with Apple is available on this device.
+  // Returns true on iOS 13+ devices and current Apple ID configured.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
+
+  async function handleAppleSignIn() {
+    setLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      // Apple returns identityToken (JWT). We hand this to Supabase.
+      if (!credential.identityToken) {
+        throw new Error('Apple sign-in did not return an identity token.');
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+      if (!data?.user?.id) throw new Error('Sign-in succeeded but no user ID returned.');
+
+      const userId = data.user.id;
+
+      // Apple returns fullName ONLY on the very first sign-in per Apple ID per app.
+      // Subsequent sign-ins (or sign-ins after a "Stop using Apple ID" reset) won't.
+      const givenName = credential.fullName?.givenName?.trim() || '';
+      const familyName = credential.fullName?.familyName?.trim() || '';
+      const appleProvidedName = !!(givenName || familyName);
+
+      // Check what's already in the users table for this Supabase user.
+      // Could be a brand new row (Apple signup) OR existing row (email user linking).
+      let existingProfile = null;
+      try {
+        const { data: existing } = await supabase
+          .from('users')
+          .select('first_name, last_name, display_name, display_format')
+          .eq('id', userId)
+          .single();
+        existingProfile = existing;
+      } catch (_) {
+        // No row yet — Supabase trigger creates it shortly; we'll write to it below
+      }
+
+      // CASE 1 — Apple gave us a name AND no first_name exists yet → save it.
+      if (appleProvidedName && !existingProfile?.first_name) {
+        try {
+          // Default to 'first_initial' for privacy-by-default
+          await supabase
+            .from('users')
+            .update({
+              first_name: givenName || null,
+              last_name: familyName || null,
+              display_format: 'first_initial',
+              display_name: familyName
+                ? `${givenName} ${familyName.charAt(0).toUpperCase()}.`
+                : givenName,
+            })
+            .eq('id', userId);
+        } catch (_) {
+          // Non-fatal — Profile Settings will let user re-enter later
+        }
+        // Show Welcome modal (first-time Apple signups get the same brand intro as email signups)
+        setWelcomeSource('apple');
+        setShowWelcome(true);
+        return;
+      }
+
+      // CASE 2 — Apple did NOT give us a name AND no first_name exists in DB → force Setup
+      if (!appleProvidedName && !existingProfile?.first_name) {
+        setSetupUser(data.user);
+        setShowProfileSetup(true);
+        return;
+      }
+
+      // CASE 3 — Existing user (has first_name OR display_name from email signup)
+      // → just sign in, no modal, AuthContext routes to Wall naturally
+      // No action needed here.
+    } catch (err) {
+      // User cancelled the Apple sheet — silent, not an error
+      if (err.code === 'ERR_REQUEST_CANCELED') return;
+
+      Alert.alert('Sign in with Apple Error', err.message || 'Could not complete sign-in.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleForgotPassword() {
     if (!email.trim()) {
@@ -58,6 +163,7 @@ export default function AuthScreen() {
           }
         });
         if (error) throw error;
+        setWelcomeSource('email');
         setShowWelcome(true);
         return;
       } else {
@@ -83,6 +189,13 @@ export default function AuthScreen() {
 
   function handleWelcomeDone() {
     setShowWelcome(false);
+
+    // Apple signups are already authenticated — just dismiss and let auth listener route them
+    if (welcomeSource === 'apple') {
+      return;
+    }
+
+    // Email signups need to confirm via emailed link before they can sign in
     setMode('signin');
     Alert.alert(
       'Check your email! 📧',
@@ -93,6 +206,28 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+
+      {/* Profile Setup Modal — required when Apple sign-in did not return a name */}
+      <Modal
+        visible={showProfileSetup}
+        animationType="slide"
+        // No transparent backdrop — ProfileSetupScreen takes the full screen
+        // No onRequestClose — this is a REQUIRED setup, user must complete it
+      >
+        {setupUser && (
+          <ProfileSetupScreen
+            user={setupUser}
+            mode="setup"
+            onComplete={() => {
+              setShowProfileSetup(false);
+              setSetupUser(null);
+              // Show the brand Welcome modal next, mirroring the Apple-with-name path
+              setWelcomeSource('apple');
+              setShowWelcome(true);
+            }}
+          />
+        )}
+      </Modal>
 
       {/* Welcome Modal */}
       <Modal
@@ -200,6 +335,24 @@ export default function AuthScreen() {
                 <Text style={s.forgotPassword}>Forgot your password?</Text>
               </TouchableOpacity>
             )}
+
+            {/* Apple Sign-In — iOS only, only when device supports it */}
+            {appleAvailable && (
+              <View style={s.appleSection}>
+                <View style={s.dividerRow}>
+                  <View style={s.dividerLine} />
+                  <Text style={s.dividerText}>or</Text>
+                  <View style={s.dividerLine} />
+                </View>
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={radius.full}
+                  style={s.appleButton}
+                  onPress={handleAppleSignIn}
+                />
+              </View>
+            )}
           </View>
 
           <Text style={s.footer}>A place to remember God's faithfulness</Text>
@@ -300,6 +453,30 @@ const s = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
     textDecorationLine: 'underline',
+  },
+  appleSection: {
+    width: '100%',
+    marginTop: spacing.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    fontFamily: fonts.ui,
+    fontSize: type.captionSize,
+    color: colors.inkLight,
+    marginHorizontal: spacing.md,
+  },
+  appleButton: {
+    width: '100%',
+    height: 52,
   },
   footer: {
     fontFamily: fonts.body,
