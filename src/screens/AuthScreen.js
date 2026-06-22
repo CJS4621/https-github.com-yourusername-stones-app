@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Modal
+  ScrollView, Modal, Linking
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ export default function AuthScreen() {
   const [welcomeSource, setWelcomeSource] = useState('email');  // 'email' or 'apple'
   const [resetSent, setResetSent]     = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Profile Setup modal — shown after Apple sign-in when name is missing
   const [showProfileSetup, setShowProfileSetup] = useState(false);
@@ -149,6 +150,10 @@ export default function AuthScreen() {
   async function handleSubmit() {
     if (!email || !password) {
       Alert.alert('Required', 'Please enter your email and password.');
+      return;
+    }
+    if (mode === 'signup' && !agreedToTerms) {
+      Alert.alert('Agreement Required', 'Please agree to the Terms of Use and Privacy Policy to continue.');
       return;
     }
     setLoading(true);
@@ -314,14 +319,49 @@ export default function AuthScreen() {
               secureTextEntry
             />
 
-            <TouchableOpacity style={s.btn} onPress={handleSubmit} disabled={loading}>
+            {mode === 'signup' && (
+              <TouchableOpacity
+                style={s.termsRow}
+                onPress={() => setAgreedToTerms(!agreedToTerms)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.checkbox, agreedToTerms && s.checkboxChecked]}>
+                  {agreedToTerms && <Text style={s.checkboxMark}>✓</Text>}
+                </View>
+                <Text style={s.termsText}>
+                  I agree to the{' '}
+                  <Text
+                    style={s.termsLink}
+                    onPress={() => Linking.openURL('https://stonesapp.ca/terms.html')}
+                  >
+                    Terms of Use
+                  </Text>
+                  {' '}and{' '}
+                  <Text
+                    style={s.termsLink}
+                    onPress={() => Linking.openURL('https://stonesapp.ca/privacy-policy.html')}
+                  >
+                    Privacy Policy
+                  </Text>
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[s.btn, mode === 'signup' && !agreedToTerms && s.btnDisabled]}
+              onPress={handleSubmit}
+              disabled={loading || (mode === 'signup' && !agreedToTerms)}
+            >
               {loading
                 ? <ActivityIndicator color="#FFF" />
                 : <Text style={s.btnText}>{mode === 'signin' ? 'Sign In' : 'Create Account'}</Text>
               }
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
+            <TouchableOpacity onPress={() => {
+              setMode(mode === 'signin' ? 'signup' : 'signin');
+              setAgreedToTerms(false);
+            }}>
               <Text style={s.toggle}>
                 {mode === 'signin'
                   ? "Don't have an account? Sign up"
@@ -434,10 +474,52 @@ const s = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadow.gold,
   },
+  btnDisabled: {
+    opacity: 0.4,
+  },
   btnText: {
     fontFamily: fonts.uiBold,
     fontSize: type.uiSize,
     color: '#FFF',
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    backgroundColor: 'transparent',
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.gold,
+  },
+  checkboxMark: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    flex: 1,
+    fontFamily: fonts.ui,
+    fontSize: type.captionSize,
+    color: colors.inkMid,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: colors.gold,
+    fontFamily: fonts.uiBold,
+    textDecorationLine: 'underline',
   },
   toggle: {
     fontFamily: fonts.ui,
